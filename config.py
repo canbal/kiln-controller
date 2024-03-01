@@ -2,7 +2,7 @@ import logging
 import os
 
 # uncomment this if using MAX-31856
-#from lib.max31856 import MAX31856
+from lib.max31856 import MAX31856
 
 ########################################################################
 #
@@ -13,7 +13,7 @@ log_level = logging.INFO
 log_format = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 
 ### Server
-listening_port = 8081
+listening_port = 80
 
 ########################################################################
 # Cost Information
@@ -22,8 +22,8 @@ listening_port = 8081
 # to produce the actual cost during a run. My kiln has three
 # elements that when my switches are set to high, consume 9460 watts.
 
-kwh_rate        = 0.1319  # cost per kilowatt hour per currency_type to calculate cost to run job
-kw_elements     = 9.460 # if the kiln elements are on, the wattage in kilowatts
+kwh_rate        = 0.42818  # cost per kilowatt hour per currency_type to calculate cost to run job
+kw_elements     = 5.200 # if the kiln elements are on, the wattage in kilowatts
 currency_type   = "$"   # Currency Symbol to show when calculating cost to run job
 
 ########################################################################
@@ -41,11 +41,11 @@ gpio_heat = 23  # Switches zero-cross solid-state-relay
 ### Thermocouple Adapter selection:
 #   max31855 - bitbang SPI interface
 #   max31856 - bitbang SPI interface. must specify thermocouple_type.
-max31855 = 1
-max31856 = 0
+max31855 = 0
+max31856 = 1
 # see lib/max31856.py for other thermocouple_type, only applies to max31856
 # uncomment this if using MAX-31856
-#thermocouple_type = MAX31856.MAX31856_S_TYPE
+thermocouple_type = MAX31856.MAX31856_K_TYPE
 
 ### Thermocouple Connection (using bitbang interfaces)
 gpio_sensor_cs = 27
@@ -60,7 +60,7 @@ gpio_sensor_di = 10 # only used with max31856
 # Every N seconds a decision is made about switching the relay[s] 
 # on & off and for how long. The thermocouple is read 
 # temperature_average_samples times during and the average value is used.
-sensor_time_wait = 2
+sensor_time_wait = 1
 
 
 ########################################################################
@@ -71,9 +71,9 @@ sensor_time_wait = 2
 # well with the simulated oven. You must tune them to work well with 
 # your specific kiln. Note that the integral pid_ki is
 # inverted so that a smaller number means more integral action.
-pid_kp = 25   # Proportional 25,200,200
-pid_ki = 10   # Integral
-pid_kd = 200  # Derivative
+pid_kp = 50   # Proportional 25,200,200
+pid_ki = 30   # Integral
+pid_kd = 500  # Derivative
 
 
 ########################################################################
@@ -87,7 +87,7 @@ stop_integral_windup = True
 ########################################################################
 #
 #   Simulation parameters
-simulate = True
+simulate = False
 sim_t_env      = 60.0   # deg C
 sim_c_heat     = 500.0  # J/K  heat capacity of heat element
 sim_c_oven     = 5000.0 # J/K  heat capacity of oven
@@ -128,7 +128,7 @@ kiln_must_catch_up = True
 # or 100% off because the kiln is too hot. No integral builds up
 # outside the window. The bigger you make the window, the more
 # integral you will accumulate. This should be a positive integer.
-pid_control_window = 5 #degrees 
+pid_control_window = 25 #degrees 
 
 # thermocouple offset
 # If you put your thermocouple in ice water and it reads 36F, you can
@@ -140,7 +140,7 @@ thermocouple_offset=0
 # If you suffer from the high temperature kiln issue and have set 
 # honour_theromocouple_short_errors to False,
 # you will likely need to increase this (eg I use 40)
-temperature_average_samples = 40 
+temperature_average_samples = 40
 
 # Thermocouple AC frequency filtering - set to True if in a 50Hz locale, else leave at False for 60Hz locale
 ac_freq_50hz = False
