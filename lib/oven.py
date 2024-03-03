@@ -9,7 +9,6 @@ import os
 import tm1637
 
 log = logging.getLogger(__name__)
-lcd = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
 
 class DupFilter(object):
     def __init__(self):
@@ -202,6 +201,8 @@ class Oven(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         self.time_step = config.sensor_time_wait
+        self.lcd = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
+        self.lcd.write([0,0,0,0])
         self.reset()
 
     def reset(self):
@@ -309,10 +310,10 @@ class Oven(threading.Thread):
     def update_lcd(self):
         try:
             temp = self.board.temp_sensor.temperature + config.thermocouple_offset
-            lcd.number(temp)
+            self.lcd.number(temp)
         except AttributeError as error:
             # this happens at start-up with a simulated oven
-            lcd.write([0,0,0,0])
+            self.lcd.write([0,0,0,0])
 
     def get_state(self):
         temp = 0
