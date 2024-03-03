@@ -214,7 +214,6 @@ class Oven(threading.Thread):
         self.target = 0
         self.heat = 0
         self.pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
-        lcd.show("IDLE")
 
     def run_profile(self, profile, startat=0):
         self.reset()
