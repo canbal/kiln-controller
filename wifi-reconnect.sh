@@ -2,6 +2,12 @@
 
 # source: https://gist.github.com/carry0987/372b9fefdd8041d0374f4e08fbf052b1
 
+# How to: run this every minute using a cron job:
+#
+#  $ sudo crontab -e
+#
+#  * * * * * /home/pi/wifi-reconnect.sh
+
 SSID=$(/sbin/iwgetid --raw)
 
 if [ -z "$SSID" ]; then
