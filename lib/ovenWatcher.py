@@ -36,6 +36,7 @@ class OvenWatcher(threading.Thread):
             else:
                 self.recording = False
             self.notify_all(oven_state)
+            tm.number(oven_state.get("temperature"))
             time.sleep(self.oven.time_step)
    
     def lastlog_subset(self,maxpts=50):
@@ -52,9 +53,7 @@ class OvenWatcher(threading.Thread):
         self.started = datetime.datetime.now()
         self.recording = True
         #we just turned on, add first state for nice graph
-        oven_state = self.oven.get_state()
-        self.last_log.append(oven_state)
-        tm.number(oven_state.get("temperature"))
+        self.last_log.append(self.oven.get_state())
 
     def add_observer(self,observer):
         if self.last_profile:
