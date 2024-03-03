@@ -15,6 +15,7 @@ class OvenWatcher(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         self.oven = oven
+        tm.show('IDLE')
         self.start()
 
 # FIXME - need to save runs of schedules in near-real-time
