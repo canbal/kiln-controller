@@ -6,8 +6,10 @@ import logging
 import json
 import config
 import os
+import tm1637
 
 log = logging.getLogger(__name__)
+lcd = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
 
 class DupFilter(object):
     def __init__(self):
@@ -213,6 +215,7 @@ class Oven(threading.Thread):
         self.target = 0
         self.heat = 0
         self.pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
+        lcd.show("IDLE")
 
     def run_profile(self, profile, startat=0):
         self.reset()
@@ -304,6 +307,9 @@ class Oven(threading.Thread):
         else:
             cost = 0
         self.cost = self.cost + cost
+    
+    def update_lcd(self):
+        lcd.number(self.temperature)
 
     def get_state(self):
         temp = 0
@@ -395,6 +401,7 @@ class Oven(threading.Thread):
                 continue
             if self.state == "RUNNING":
                 self.update_cost()
+                self.update_lcd()
                 self.save_automatic_restart_state()
                 self.kiln_must_catch_up()
                 self.update_runtime()

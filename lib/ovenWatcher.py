@@ -1,9 +1,7 @@
 import threading,logging,json,time,datetime
-import config,tm1637
 from oven import Oven
 log = logging.getLogger(__name__)
 
-tm = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
 
 class OvenWatcher(threading.Thread):
     def __init__(self,oven):
@@ -15,7 +13,6 @@ class OvenWatcher(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         self.oven = oven
-        tm.show('IDLE')
         self.start()
 
 # FIXME - need to save runs of schedules in near-real-time
@@ -36,7 +33,6 @@ class OvenWatcher(threading.Thread):
             else:
                 self.recording = False
             self.notify_all(oven_state)
-            tm.number(oven_state.get("temperature"))
             time.sleep(self.oven.time_step)
    
     def lastlog_subset(self,maxpts=50):
