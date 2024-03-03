@@ -202,7 +202,9 @@ class Oven(threading.Thread):
         self.daemon = True
         self.time_step = config.sensor_time_wait
         self.lcd = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
+        self.lcd2 = tm1637.TM1637(clk=config.gpio_lcd2_clk, dio=config.gpio_lcd2_dio)
         self.lcd.write([0,0,0,0])
+        self.lcd2.write([0,0,0,0])
         self.reset()
 
     def reset(self):
@@ -311,10 +313,11 @@ class Oven(threading.Thread):
         temp = 0
         try:
             temp = self.board.temp_sensor.temperature + config.thermocouple_offset
-            self.lcd.number(int(temp))
+            self.lcd.number(int(temp + 0.5))
         except AttributeError as error:
             # this happens at start-up with a simulated oven
             self.lcd.write([0,0,0,0])
+        self.lcd2.number(int(self.target))
         
 
     def get_state(self):

@@ -54,6 +54,8 @@ gpio_sensor_data = 17
 gpio_sensor_di = 10 # only used with max31856
 gpio_lcd_clk = 15
 gpio_lcd_dio = 14
+gpio_lcd2_clk = 4
+gpio_lcd2_dio = 3
 
 ########################################################################
 #
