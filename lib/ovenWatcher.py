@@ -1,6 +1,9 @@
 import threading,logging,json,time,datetime
+import config,tm1637
 from oven import Oven
 log = logging.getLogger(__name__)
+
+tm = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
 
 class OvenWatcher(threading.Thread):
     def __init__(self,oven):
@@ -48,7 +51,9 @@ class OvenWatcher(threading.Thread):
         self.started = datetime.datetime.now()
         self.recording = True
         #we just turned on, add first state for nice graph
-        self.last_log.append(self.oven.get_state())
+        oven_state = self.oven.get_state()
+        self.last_log.append(oven_state)
+        tm.number(oven_state.get("temperature"))
 
     def add_observer(self,observer):
         if self.last_profile:

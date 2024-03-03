@@ -6,10 +6,8 @@ import logging
 import json
 import config
 import os
-import tm1637
 
 log = logging.getLogger(__name__)
-tm = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
 
 class DupFilter(object):
     def __init__(self):
@@ -270,9 +268,6 @@ class Oven(threading.Thread):
 
     def update_target_temp(self):
         self.target = self.profile.get_target_temperature(self.runtime)
-
-    def update_lcd(self):
-        tm.number(self.temperature)
 
     def reset_if_emergency(self):
         '''reset if the temperature is way TOO HOT, or other critical errors detected'''
