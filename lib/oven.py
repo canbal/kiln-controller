@@ -201,7 +201,6 @@ class Oven(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.temperature = 0
         self.time_step = config.sensor_time_wait
         self.reset()
 
@@ -309,7 +308,12 @@ class Oven(threading.Thread):
         self.cost = self.cost + cost
     
     def update_lcd(self):
-        lcd.number(self.temperature)
+        try:
+            temp = self.board.temp_sensor.temperature + config.thermocouple_offset
+            lcd.number(temp)
+        except AttributeError as error:
+            # this happens at start-up with a simulated oven
+            lcd.write([0,0,0,0])
 
     def get_state(self):
         temp = 0
@@ -394,6 +398,7 @@ class Oven(threading.Thread):
 
     def run(self):
         while True:
+            self.update_lcd()
             if self.state == "IDLE":
                 if self.should_i_automatic_restart() == True:
                     self.automatic_restart()
@@ -401,7 +406,6 @@ class Oven(threading.Thread):
                 continue
             if self.state == "RUNNING":
                 self.update_cost()
-                self.update_lcd()
                 self.save_automatic_restart_state()
                 self.kiln_must_catch_up()
                 self.update_runtime()
