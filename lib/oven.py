@@ -306,14 +306,16 @@ class Oven(threading.Thread):
         else:
             cost = 0
         self.cost = self.cost + cost
-    
+
     def update_lcd(self):
+        temp = 0
         try:
             temp = self.board.temp_sensor.temperature + config.thermocouple_offset
-            self.lcd.number(temp)
+            self.lcd.number(int(temp))
         except AttributeError as error:
             # this happens at start-up with a simulated oven
             self.lcd.write([0,0,0,0])
+        
 
     def get_state(self):
         temp = 0
