@@ -132,7 +132,15 @@ kiln_must_catch_up = True
 # or 100% off because the kiln is too hot. No integral builds up
 # outside the window. The bigger you make the window, the more
 # integral you will accumulate. This should be a positive integer.
-pid_control_window = 5 #degrees 
+pid_control_window = 5 #degrees
+
+# Warmup skip: during initial heating, the kiln often overshoots the low
+# target temperatures. Instead of pausing the schedule and waiting for
+# the kiln to cool back down (which causes repeated overshoot cycles),
+# skip ahead in the schedule to where the target matches current temp.
+# This only applies when BOTH current temp AND target temp are below
+# this threshold. Set to 0 to disable this feature.
+warmup_skip_threshold = 150 #degrees
 
 # thermocouple offset
 # If you put your thermocouple in ice water and it reads 36F, you can

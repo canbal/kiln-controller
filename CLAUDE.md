@@ -88,6 +88,7 @@ Edit `watcher.py` with your kiln URL and Slack webhook, then:
 - `sensor_time_wait` - Control loop cycle time in seconds
 - `emergency_shutoff_temp` - Safety cutoff temperature
 - `kiln_must_catch_up` - Pause schedule if kiln can't keep up
+- `warmup_skip_threshold` - Below this temp, skip ahead instead of waiting when kiln overshoots (set to 0 to disable)
 - `automatic_restarts` - Resume after power outage
 
 ## Important Behaviors
@@ -96,3 +97,4 @@ Edit `watcher.py` with your kiln URL and Slack webhook, then:
 - Temperature readings are averaged over multiple samples to filter noise
 - State is saved to `state.json` for automatic restart after power loss
 - The `kiln_must_catch_up` feature shifts the schedule forward when temperature deviates too far from target
+- **Warmup skip**: When both current and target temps are below `warmup_skip_threshold` and the kiln overshoots, the schedule skips ahead to where target matches current temp (avoiding repeated overshoot/wait cycles during initial heating)

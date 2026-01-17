@@ -259,6 +259,22 @@ class Oven(threading.Thread):
                 self.start_time = datetime.datetime.now() - datetime.timedelta(milliseconds = self.runtime * 1000)
             # kiln too hot, wait for it to cool down
             if temp - self.target > config.pid_control_window:
+                # Check for warmup skip: if both temps are below threshold,
+                # skip ahead in schedule instead of waiting to cool down
+                if (hasattr(config, 'warmup_skip_threshold') and
+                    config.warmup_skip_threshold > 0 and
+                    temp < config.warmup_skip_threshold and
+                    self.target < config.warmup_skip_threshold):
+                    skip_to_time = self.profile.find_time_for_temperature(temp, self.runtime)
+                    if skip_to_time is not None and skip_to_time > self.runtime:
+                        log.info("warmup skip: jumping from %.1fs to %.1fs (temp=%.1f, old_target=%.1f)" %
+                                 (self.runtime, skip_to_time, temp, self.target))
+                        self.start_time = datetime.datetime.now() - datetime.timedelta(seconds=skip_to_time)
+                        # Reset PID state to avoid integral windup from the skipped phase
+                        self.pid.iterm = 0
+                        self.pid.lastErr = 0
+                        return
+
                 log.info("kiln must catch up, too hot, shifting schedule")
                 self.start_time = datetime.datetime.now() - datetime.timedelta(milliseconds = self.runtime * 1000)
 
@@ -592,6 +608,52 @@ class Profile():
         incl = float(next_point[1] - prev_point[1]) / float(next_point[0] - prev_point[0])
         temp = prev_point[1] + (time - prev_point[0]) * incl
         return temp
+
+    def find_time_for_temperature(self, target_temp, from_time=0):
+        '''
+        Find the earliest time >= from_time where the schedule reaches target_temp.
+        Used for warmup skip: when kiln overshoots early in schedule, find where
+        to jump ahead so the schedule target matches the current kiln temperature.
+        Returns the time in seconds, or None if target_temp is never reached.
+        '''
+        if from_time >= self.get_duration():
+            return None
+
+        # Check if we're already at or above target at from_time
+        current = self.get_target_temperature(from_time)
+        if current >= target_temp:
+            return from_time
+
+        # Search through schedule segments starting from from_time
+        for i in range(1, len(self.data)):
+            seg_start_time, seg_start_temp = self.data[i-1]
+            seg_end_time, seg_end_temp = self.data[i]
+
+            # Skip segments that end before from_time
+            if seg_end_time <= from_time:
+                continue
+
+            # For segments we're in the middle of, adjust the effective start
+            if from_time > seg_start_time:
+                seg_start_time = from_time
+                seg_start_temp = self.get_target_temperature(from_time)
+
+            # Check if target_temp is reached within this segment
+            if seg_end_temp >= target_temp:
+                # If we're already at or above target at segment start
+                if seg_start_temp >= target_temp:
+                    return seg_start_time
+
+                # Interpolate to find exact crossing time
+                temp_span = seg_end_temp - seg_start_temp
+                if temp_span <= 0:
+                    continue  # Flat or cooling segment, can't reach higher temp
+
+                time_span = seg_end_time - seg_start_time
+                temp_needed = target_temp - seg_start_temp
+                return seg_start_time + (temp_needed / temp_span) * time_span
+
+        return None
 
 
 class PID():
