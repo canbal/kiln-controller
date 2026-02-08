@@ -10,6 +10,24 @@ import tm1637
 
 log = logging.getLogger(__name__)
 
+
+def get_thermocouple_offset(raw_temp):
+    '''Compute temperature-dependent offset by interpolating the correction table.
+    Falls back to flat thermocouple_offset if no table is defined.'''
+    table = getattr(config, 'thermocouple_correction_table', None)
+    if not table:
+        return getattr(config, 'thermocouple_offset', 0)
+    if raw_temp <= table[0][0]:
+        return table[0][1]
+    if raw_temp >= table[-1][0]:
+        return table[-1][1]
+    for i in range(1, len(table)):
+        if raw_temp <= table[i][0]:
+            t0, o0 = table[i-1]
+            t1, o1 = table[i]
+            return o0 + (o1 - o0) * (raw_temp - t0) / (t1 - t0)
+    return table[-1][1]
+
 class DupFilter(object):
     def __init__(self):
         self.msgs = set()
@@ -252,7 +270,7 @@ class Oven(threading.Thread):
         to wait for the kiln to catch up'''
         if config.kiln_must_catch_up == True:
             temp = self.board.temp_sensor.temperature + \
-                config.thermocouple_offset
+                get_thermocouple_offset(self.board.temp_sensor.temperature)
             # kiln too cold, wait for it to heat up
             if self.target - temp > config.pid_control_window:
                 log.info("kiln must catch up, too cold, shifting schedule")
@@ -291,7 +309,7 @@ class Oven(threading.Thread):
 
     def reset_if_emergency(self):
         '''reset if the temperature is way TOO HOT, or other critical errors detected'''
-        if (self.board.temp_sensor.temperature + config.thermocouple_offset >=
+        if (self.board.temp_sensor.temperature + get_thermocouple_offset(self.board.temp_sensor.temperature) >=
             config.emergency_shutoff_temp):
             log.info("emergency!!! temperature too high")
             if config.ignore_temp_too_high == False:
@@ -328,7 +346,7 @@ class Oven(threading.Thread):
     def update_lcd(self):
         temp = 0
         try:
-            temp = self.board.temp_sensor.temperature + config.thermocouple_offset
+            temp = self.board.temp_sensor.temperature + get_thermocouple_offset(self.board.temp_sensor.temperature)
             self.lcd.number(int(temp + 0.5))
         except AttributeError as error:
             # this happens at start-up with a simulated oven
@@ -339,7 +357,7 @@ class Oven(threading.Thread):
     def get_state(self):
         temp = 0
         try:
-            temp = self.board.temp_sensor.temperature + config.thermocouple_offset
+            temp = self.board.temp_sensor.temperature + get_thermocouple_offset(self.board.temp_sensor.temperature)
         except AttributeError as error:
             # this happens at start-up with a simulated oven
             temp = 0
@@ -482,7 +500,7 @@ class SimulatedOven(Oven):
     def heat_then_cool(self):
         pid = self.pid.compute(self.target,
                                self.board.temp_sensor.temperature +
-                               config.thermocouple_offset)
+                               get_thermocouple_offset(self.board.temp_sensor.temperature))
         heat_on = float(self.time_step * pid)
         heat_off = float(self.time_step * (1 - pid))
 
@@ -544,7 +562,7 @@ class RealOven(Oven):
     def heat_then_cool(self):
         pid = self.pid.compute(self.target,
                                self.board.temp_sensor.temperature +
-                               config.thermocouple_offset)
+                               get_thermocouple_offset(self.board.temp_sensor.temperature))
         heat_on = float(self.time_step * pid)
         heat_off = float(self.time_step * (1 - pid))
 
