@@ -7,6 +7,41 @@ Last updated: 2026-02-08
 This document is the source of truth for the UI modernization work.
 If the plan changes, update this file first, then implement.
 
+## Collaboration Workflow (Multi-Agent)
+
+This repo is expected to have multiple AI agents contributing over time.
+To keep work parallelizable and reviewable, follow these conventions:
+
+- One PR should implement one Task ID (or a tight group of adjacent Task IDs).
+- Every PR that changes behavior should update this `TODO.md`:
+  - mark the relevant Task ID(s) as DONE
+  - add the merge commit SHA(s)
+  - link the PR number/URL if available
+- Prefer parallel work by splitting across Workstreams (frontend shell, backend sessions, docs, etc.).
+- Avoid breaking changes and avoid touching `/picoreflow` during migration.
+
+### Status Legend
+
+- PLANNED: not started
+- IN_PROGRESS: actively being worked on (include owner/agent handle)
+- BLOCKED: needs a dependency task completed
+- DONE: merged to `master` (include merge commit SHA)
+- DEFERRED: intentionally postponed
+
+### Task Record Format
+
+Each task uses a stable ID, so multiple agents can coordinate without confusion.
+
+Use this template when adding new tasks:
+
+- [ ] `T-XXXX` Short title
+  - status: PLANNED | IN_PROGRESS | BLOCKED | DONE | DEFERRED
+  - owner: @handle-or-agent-name
+  - deps: `T-YYYY`, `T-ZZZZ`
+  - acceptance: one sentence of how to verify
+  - PR: <url or number>
+  - commit: <merge sha>
+
 ## Goals
 
 - Modern, mobile-first UI that works well on phones and small screens.
@@ -162,148 +197,220 @@ Deliverables:
 Each milestone should be deliverable as 1-3 small PRs.
 Do not implement later milestones until earlier ones are stable on the kiln.
 
-### 0) Docs Only: Contracts + Fixtures
+## Workstreams (For Parallel Execution)
 
-Work:
+Agents can work in parallel as long as dependencies are respected:
 
-- Add/maintain `docs/contracts.md`.
-- Capture example `/status` backlog message and steady-state messages.
-- Capture `/api/stats` payload example.
+- WS-DOCS: contracts, fixtures, API docs
+- WS-FE-SHELL: new UI shell, layout, routing, mobile-first structure
+- WS-FE-CHARTS: charting, WS client, cooling-tail visualization
+- WS-BE-SESSIONS: SQLite DB, session lifecycle, sampling, cooling capture
+- WS-FE-CONTROLS: minimal start/stop and profile selection (optional early)
+- WS-FE-HISTORY: session list/detail, notes UI
+- WS-BE-API: `/v1/*` endpoints for sessions/config
+- WS-CONFIG: config override storage + UI (later)
+- WS-PROFILES: profile editor (later)
+- WS-LIVE-EDIT: live profile edits during run (later)
 
-Acceptance:
+## Task Board (Source of Truth)
 
-- Another agent can implement a typed API client and chart without asking questions.
+Rules:
 
-### 1) New UI Shell (Complementary, Read-Only, Side-by-Side)
+- Only mark DONE when merged to `master`.
+- Always fill in `commit:` for DONE tasks.
+- Keep tasks small enough for review (ideally < ~500 LOC net change per PR).
 
-Work:
+### Milestone 0: Docs Only (Contracts + Fixtures)
 
-- Add a new route (recommended `/app`) serving a new frontend.
-- Keep `/` redirect and `/picoreflow` intact.
-- Basic responsive layout with:
-  - connection status
-  - current temperature, target temperature, run state
-  - error/banner area
+- [ ] `T-0001` Add `docs/contracts.md` covering `/status`, `/control`, `/storage`, `/config`, `/api`
+  - status: PLANNED
+  - owner:
+  - deps:
+  - acceptance: `docs/contracts.md` includes example JSON payloads and units
+  - PR:
+  - commit:
 
-Acceptance:
+- [ ] `T-0002` Add fixture JSON for `/status` backlog + steady-state messages
+  - status: PLANNED
+  - owner:
+  - deps: `T-0001`
+  - acceptance: fixtures exist and are referenced by docs/tests later
+  - PR:
+  - commit:
 
-- `/picoreflow` unchanged.
-- `/app` loads on desktop and phone.
+- [ ] `T-0003` Add fixture JSON for `/api/stats` payload
+  - status: PLANNED
+  - owner:
+  - deps: `T-0001`
+  - acceptance: fixture exists and matches current server output shape
+  - PR:
+  - commit:
 
-### 2) Read-Only Dashboard + Live Chart (Immediate UX Improvement)
+### Milestone 1: New UI Shell (Complementary, Read-Only)
 
-Work:
+- [ ] `T-0101` Add `/app` route that serves new static UI without touching `/picoreflow`
+  - status: PLANNED
+  - owner:
+  - deps: `T-0001`
+  - acceptance: `/picoreflow/index.html` still loads; `/app` loads on phone
+  - PR:
+  - commit:
 
-- Implement a robust live chart (actual temp + target when available).
-- Add clear metrics cards (mobile-first).
-- Add graceful WS reconnect behavior.
+- [ ] `T-0102` Create `frontend/` React+TS+Vite skeleton and produce committed build output in `public/app/`
+  - status: PLANNED
+  - owner:
+  - deps: `T-0101`
+  - acceptance: repo can be pulled on kiln and restarted without extra build steps
+  - PR:
+  - commit:
 
-Acceptance:
+### Milestone 2: Read-Only Dashboard + Live Chart
 
-- Works reliably on small screens.
-- No profile editing features in new UI yet.
+- [ ] `T-0201` Implement WS `/status` client with reconnect and Zod validation
+  - status: PLANNED
+  - owner:
+  - deps: `T-0002`, `T-0102`
+  - acceptance: UI survives WS disconnect/reconnect and continues updating
+  - PR:
+  - commit:
 
-### 3) Sessions Capture (SQLite) + Cooling Tail Recording (Foundational)
+- [ ] `T-0202` Add read-only dashboard metrics (temp/target/state) optimized for small screens
+  - status: PLANNED
+  - owner:
+  - deps: `T-0201`
+  - acceptance: phone layout is usable without horizontal scrolling
+  - PR:
+  - commit:
 
-Work:
+- [ ] `T-0203` Add ECharts live plot (actual temp + target when available)
+  - status: PLANNED
+  - owner:
+  - deps: `T-0201`
+  - acceptance: chart renders and updates without noticeable lag
+  - PR:
+  - commit:
 
-- Add SQLite DB and minimal migration/versioning.
-- Create a session for each run and store samples at 1Hz.
-- Store full state per sample as JSON.
-- Continue recording after profile ends until stop condition:
-  - temp < 200F/93C OR 48h cap.
+### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)
 
-Acceptance:
+- [ ] `T-0301` Add SQLite DB file, schema versioning, and minimal migrations
+  - status: PLANNED
+  - owner:
+  - deps:
+  - acceptance: fresh boot creates DB; version table exists
+  - PR:
+  - commit:
 
-- A test run produces a session and sample rows.
-- Recording includes post-profile cooling tail.
+- [ ] `T-0302` Create/stop sessions automatically on run start/stop (server-driven)
+  - status: PLANNED
+  - owner:
+  - deps: `T-0301`
+  - acceptance: starting a run creates a session row with profile_name
+  - PR:
+  - commit:
 
-### 4) Cooling Tail Visualization (Pulled Early)
+- [ ] `T-0303` Persist one sample per control loop (`sensor_time_wait`) with full `Oven.get_state()` JSON
+  - status: PLANNED
+  - owner:
+  - deps: `T-0302`
+  - acceptance: 10-minute run produces ~600 samples
+  - PR:
+  - commit:
 
-Work:
+- [ ] `T-0304` Continue recording after profile end until temp threshold/cap reached
+  - status: PLANNED
+  - owner:
+  - deps: `T-0303`
+  - acceptance: post-profile cooling samples exist and stop at <200F/93C (or 48h)
+  - PR:
+  - commit:
 
-- UI can view the current session or most recent session.
-- Chart shows:
-  - actual temperature line
-  - target line while RUNNING (optional, depends on stored state)
-  - marker for end-of-profile and end-of-cooling-capture
-- Ensure long sessions render without freezing (windowed queries or basic downsampling on display only).
+### Milestone 4: Cooling Tail Visualization (Early Feature)
 
-Acceptance:
+- [ ] `T-0401` Add `/v1/sessions` and `/v1/sessions/:id/samples` read endpoints
+  - status: PLANNED
+  - owner:
+  - deps: `T-0304`
+  - acceptance: curl can list sessions and fetch a sample window
+  - PR:
+  - commit:
 
-- Natural cooling tail is visible and reviewable.
+- [ ] `T-0402` New UI: show most recent session chart with cooling tail + markers
+  - status: PLANNED
+  - owner:
+  - deps: `T-0401`, `T-0203`
+  - acceptance: chart shows tail beyond end-of-profile and indicates end marker
+  - PR:
+  - commit:
 
-### 5) Minimal Controls in New UI (Optional Convenience)
+### Milestone 5: Minimal Controls in New UI (Optional)
 
-Work:
+- [ ] `T-0501` New UI: profile selection (read-only list) using existing `/storage` or new endpoint
+  - status: PLANNED
+  - owner:
+  - deps: `T-0102`
+  - acceptance: profile list shows and selection persists in UI state
+  - PR:
+  - commit:
 
-- Profile selection + start/stop via existing `/api` or `/control`.
-- Strong safety UX: clear state, confirmations, and error handling.
-- Old UI remains the fallback.
+- [ ] `T-0502` New UI: start/stop run using existing `/api` (add safety confirmations)
+  - status: PLANNED
+  - owner:
+  - deps: `T-0501`
+  - acceptance: run starts/stops reliably; old UI still works
+  - PR:
+  - commit:
 
-Acceptance:
+### Milestone 6: Firing History + Notes
 
-- New UI can start/stop a run, but does not block continued use of old UI.
+- [ ] `T-0601` Add `/v1/sessions/:id` and `PATCH /v1/sessions/:id` for notes
+  - status: PLANNED
+  - owner:
+  - deps: `T-0401`
+  - acceptance: notes persist across restarts
+  - PR:
+  - commit:
 
-### 6) Firing History + Notes (User Value + Platform)
+- [ ] `T-0602` New UI: session list + detail page + notes editing
+  - status: PLANNED
+  - owner:
+  - deps: `T-0601`
+  - acceptance: user can browse and annotate past firings on phone
+  - PR:
+  - commit:
 
-Work:
+### Milestones 7-10: Later Work (Config, Profile Editing, Decommission)
 
-- UI: sessions list + session detail page + notes.
-- Backend: `/v1/sessions/*` endpoints implemented.
+- [ ] `T-0701` Config override file (`config_override.json`) + safe apply semantics (block when RUNNING)
+  - status: PLANNED
+  - owner:
+  - deps:
+  - acceptance: overrides apply only when kiln not running
+  - PR:
+  - commit:
 
-Acceptance:
+- [ ] `T-0801` Profile editor V1 (table-first) in new UI
+  - status: PLANNED
+  - owner:
+  - deps:
+  - acceptance: can edit/save profiles without using old UI
+  - PR:
+  - commit:
 
-- Past firings are browseable; notes persist.
+- [ ] `T-0901` Live profile editing during run (future-only) + audit trail stored with session
+  - status: PLANNED
+  - owner:
+  - deps: `T-0602`
+  - acceptance: live edits affect future target curve and are recorded
+  - PR:
+  - commit:
 
-### 7) Config Control Panel (Safe, Additive)
-
-Work:
-
-- Introduce `config_override.json` (do not write to `config.py`).
-- Apply semantics: only when kiln is NOT running (RUNNING must block apply).
-- UI groups settings with ranges and warnings.
-
-Acceptance:
-
-- Config changes can be made without editing `config.py`, safely.
-
-### 8) Profile Editor V1 (Later)
-
-Work:
-
-- CRUD and table-first editor.
-- Strong validation (monotonic time, sane slopes, unit conversions).
-
-Acceptance:
-
-- Editing is safer and less clunky than old UI.
-
-### 9) Profile Editor V2 + Live Profile Editing During Run (Later, Major Feature)
-
-Work:
-
-- Drag/graph editing and/or live edits of future schedule points.
-- Rules for live edits (V1):
-  - cannot change the past
-  - edits must be future-only relative to current runtime
-  - server validates monotonic time and basic slope constraints
-- Every live edit is recorded as a session event (append-only audit trail).
-
-Acceptance:
-
-- Live edits change the remaining target curve safely and are auditable.
-
-### 10) Decommission Old UI
-
-Work:
-
-- Only after new UI is stable and provides required operational capability.
-- Switch `/` from `/picoreflow` to `/app` and keep a temporary fallback link.
-
-Acceptance:
-
-- New UI is default; old UI removed only when safe.
+- [ ] `T-1001` Decommission old UI (switch `/` to `/app`, keep fallback temporarily)
+  - status: PLANNED
+  - owner:
+  - deps: `T-0801`
+  - acceptance: new UI is default; old UI retired safely
+  - PR:
+  - commit:
 
 ## Testing Strategy (Minimum Bar)
 
@@ -330,3 +437,7 @@ Operational:
 - Treat milestones as gates. Do not start editing features until read-only + sessions + cooling are stable.
 - Prefer small PRs with clear acceptance criteria.
 - If a tradeoff arises, prioritize kiln safety and operational stability over UI polish.
+
+## Change Log
+
+- 2026-02-08: initial plan added (commit `e223b48`)
