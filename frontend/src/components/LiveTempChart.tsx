@@ -70,6 +70,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
   const LIVE_WINDOW_MS = 30 * 60 * 1000
   const MIN_ZOOM_MS = 10 * 1000
+  const DEFAULT_TOL_MS = 750
 
   const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
   const unitRef = useRef(unit)
@@ -333,6 +334,20 @@ export function LiveTempChart(props: LiveTempChartProps) {
     }, 0)
   }
 
+  const isAtDefaultLiveWindow = (chart: EChartsType): boolean => {
+    const extent = timeExtent()
+    if (!extent) return false
+    const win = readZoomWindowValues(chart)
+    if (!win) return false
+
+    const fullSpan = extent.max - extent.min
+    if (!(fullSpan > 0)) return false
+
+    const defEnd = extent.max
+    const defStart = fullSpan < LIVE_WINDOW_MS ? extent.min : extent.max - LIVE_WINDOW_MS
+    return Math.abs(win.startValue - defStart) <= DEFAULT_TOL_MS && Math.abs(win.endValue - defEnd) <= DEFAULT_TOL_MS
+  }
+
   const baseOption = useMemo(
     () => ({
       animation: false,
@@ -451,7 +466,19 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
       showZoomSpanHint(chart)
 
-      // Any manual dataZoom interaction disables the default auto live window.
+      // Any manual dataZoom interaction disables the default auto live window,
+      // unless the user is already back at the default window.
+      if (isAtDefaultLiveWindow(chart)) {
+        autoLiveWindowRef.current = true
+        setAutoLiveWindow(true)
+        lockedRangeRef.current = null
+        if (!followLiveRef.current) {
+          followLiveRef.current = true
+          setFollowLive(true)
+        }
+        return
+      }
+
       autoLiveWindowRef.current = false
       setAutoLiveWindow(false)
 
