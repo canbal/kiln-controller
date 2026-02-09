@@ -12,13 +12,18 @@ If the plan changes, update this file first, then implement.
 This repo is expected to have multiple AI agents contributing over time.
 To keep work parallelizable and reviewable, follow these conventions:
 
-- One PR should implement one Task ID (or a tight group of adjacent Task IDs).
+- One agent should work on exactly one Task ID.
+- One PR should implement one Task ID.
 - Always work on a branch and use PRs; do not push directly to the default branch (`master`/`main`).
+- Every PR must be reviewed by the human maintainer before it is merged.
+  - Agents must not merge PRs on their own.
+  - Wait for an explicit maintainer message containing the word "merge" for that PR before merging.
 - Update `TODO.md` as part of the PR lifecycle:
   - when you open a PR for a task, mark it `IN_PROGRESS`, set `owner:`, and fill `PR:`
   - when the PR is merged, mark it `DONE` and fill `commit:` with the merge SHA
+  - when a task is `DONE`, also check its box (`- [x]`)
 - Handoff expectation: after completing a task (typically after the bookkeeping PR merges), include a copy/paste prompt for the next agent.
-  - The maintainer will often clear chat context and start a new session; the handoff prompt should be self-contained and point to the next Task ID(s).
+  - The maintainer will often clear chat context and start a new session; the handoff prompt should be self-contained and point to the next Task ID.
   - Also copy the handoff prompt to the clipboard on macOS by executing `pbcopy` in the repo shell (so the maintainer only needs to paste into the new chat).
 - Every PR that changes behavior should update this `TODO.md`:
   - mark the relevant Task ID(s) as DONE
@@ -225,6 +230,7 @@ Rules:
 
 - Only mark DONE when merged to `master`.
 - Always fill in `commit:` for DONE tasks.
+- When a task is DONE, its checkbox must be checked (`- [x]`).
 - Keep tasks small enough for review (ideally < ~500 LOC net change per PR).
 
 ### Milestone 0: Docs Only (Contracts + Fixtures)
@@ -237,7 +243,7 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/1
   - commit: a2126dd94ea50cf10c67f8036c66dbfc4575d6aa
 
-- [ ] `T-0002` Add fixture JSON for `/status` backlog + steady-state messages
+- [x] `T-0002` Add fixture JSON for `/status` backlog + steady-state messages
   - status: DONE
   - owner: @opencode
   - deps: `T-0001`
@@ -245,7 +251,7 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/5
   - commit: b4996e65319d81436cbfcd5f7d5ebc967b918d01
 
-- [ ] `T-0003` Add fixture JSON for `/api/stats` payload
+- [x] `T-0003` Add fixture JSON for `/api/stats` payload
   - status: DONE
   - owner: @opencode
   - deps: `T-0001`
