@@ -42,6 +42,29 @@ function formatPowerPct(oven: { heat?: number | null; pidstats?: Record<string, 
   return '--'
 }
 
+function formatDurationSeconds(v: number | null | undefined): string {
+  if (v === null || v === undefined) return '--'
+  if (!Number.isFinite(v)) return '--'
+  const total = Math.max(0, Math.floor(v))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function computeProgressPct(runtimeS: number | null, totalS: number | null): number | null {
+  if (runtimeS === null || totalS === null) return null
+  if (!Number.isFinite(runtimeS) || !Number.isFinite(totalS)) return null
+  if (!(totalS > 0)) return null
+  const raw = (runtimeS / totalS) * 100
+  if (!Number.isFinite(raw)) return null
+  return Math.max(0, Math.min(100, raw))
+}
+
 function connectionLabel(s: string): string {
   switch (s) {
     case 'open':
@@ -77,6 +100,22 @@ function App() {
   const oven = status.state
   const running = oven?.state === 'RUNNING'
   const unit = cfg.tempScale === 'c' ? 'C' : cfg.tempScale === 'f' ? 'F' : ''
+
+  const runtimeS = oven && Number.isFinite(oven.runtime) ? oven.runtime : null
+  const wallElapsedS = oven && typeof oven.elapsed === 'number' && Number.isFinite(oven.elapsed) ? oven.elapsed : null
+  const totalS = oven && Number.isFinite(oven.totaltime) ? oven.totaltime : null
+  const progressPct = running ? computeProgressPct(runtimeS, totalS) : null
+  const remainingS = running && runtimeS !== null && totalS !== null ? Math.max(0, totalS - runtimeS) : null
+  const estRemainingS =
+    running && runtimeS !== null && runtimeS > 0 && wallElapsedS !== null && remainingS !== null
+      ? (wallElapsedS / runtimeS) * remainingS
+      : null
+
+  const cooldownActive = oven?.cooldown_active === true
+  const cooldownElapsedS =
+    cooldownActive && typeof oven?.cooldown_elapsed === 'number' && Number.isFinite(oven.cooldown_elapsed)
+      ? oven.cooldown_elapsed
+      : null
 
   return (
     <main className="app">
@@ -130,6 +169,38 @@ function App() {
             <div className="tile">
               <div className="tileLabel">Power</div>
               <div className="tileValue">{formatPowerPct(oven)}%</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Progress</div>
+              <div className="tileValue">{progressPct === null ? '--' : `${Math.round(progressPct)}%`}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Runtime</div>
+              <div className="tileValue tileValue--mono">{formatDurationSeconds(running ? runtimeS : null)}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Elapsed</div>
+              <div className="tileValue tileValue--mono">{formatDurationSeconds(running ? wallElapsedS : null)}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Remaining</div>
+              <div className="tileValue tileValue--mono">{formatDurationSeconds(remainingS)}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Est remaining</div>
+              <div className="tileValue tileValue--mono">{formatDurationSeconds(estRemainingS)}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Cooldown</div>
+              <div className="tileValue tileValue--mono">
+                {cooldownActive ? formatDurationSeconds(cooldownElapsedS) : '--'}
+              </div>
             </div>
 
             <div className="tile tile--wide">
