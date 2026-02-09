@@ -1,6 +1,43 @@
 import './App.css'
+import { useStatusWs } from './ws/status'
+
+function formatTime(d: Date | null): string {
+  if (!d) return 'never'
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function formatAgeMs(ms: number | null): string {
+  if (ms === null) return 'n/a'
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  return `${Math.round(ms / 1000)}s`
+}
+
+function formatNumber(v: number | null | undefined): string {
+  if (v === null || v === undefined) return '--'
+  return Number.isFinite(v) ? v.toFixed(1) : '--'
+}
+
+function connectionLabel(s: string): string {
+  switch (s) {
+    case 'open':
+      return 'Connected'
+    case 'connecting':
+      return 'Connecting'
+    case 'reconnecting':
+      return 'Reconnecting'
+    case 'closed':
+      return 'Closed'
+    case 'error':
+      return 'Error'
+    default:
+      return s
+  }
+}
 
 function App() {
+  const status = useStatusWs()
+
   return (
     <main className="app">
       <header className="top">
@@ -8,12 +45,60 @@ function App() {
           <div className="kicker">Kiln Controller</div>
           <h1 className="title">New UI (Preview)</h1>
         </div>
-        <div className="pill" role="note" aria-label="Status">
-          Work in progress
+        <div className={`pill pillStatus pillStatus--${status.connection}`} role="note" aria-label="Status">
+          <span className="dot" aria-hidden="true" />
+          {connectionLabel(status.connection)}
         </div>
       </header>
 
       <section className="grid" aria-label="Cards">
+        <article className="card">
+          <h2>Live Status</h2>
+          <p className="muted">
+            WebSocket: <code>{status.urlPath}</code>
+          </p>
+
+          <div className="statusGrid" aria-label="Connection info">
+            <div className="kv compact">
+              <div className="k">Conn</div>
+              <div className="v">{connectionLabel(status.connection)}</div>
+            </div>
+            <div className="kv compact">
+              <div className="k">Last msg</div>
+              <div className="v">{formatTime(status.lastMessageAt)}</div>
+            </div>
+            <div className="kv compact">
+              <div className="k">Age</div>
+              <div className="v">{formatAgeMs(status.lastMessageAgeMs)}</div>
+            </div>
+            <div className="kv compact">
+              <div className="k">Valid</div>
+              <div className="v">{status.lastMessageValid ? 'yes' : 'no'}</div>
+            </div>
+          </div>
+
+          <div className="statusGrid" aria-label="Latest state">
+            <div className="kv compact">
+              <div className="k">State</div>
+              <div className="v">{status.state?.state ?? '--'}</div>
+            </div>
+            <div className="kv compact">
+              <div className="k">Temp</div>
+              <div className="v">{formatNumber(status.state?.temperature)}&deg;</div>
+            </div>
+            <div className="kv compact">
+              <div className="k">Target</div>
+              <div className="v">{formatNumber(status.state?.target)}&deg;</div>
+            </div>
+            <div className="kv compact">
+              <div className="k">Profile</div>
+              <div className="v">{status.state?.profile ?? '--'}</div>
+            </div>
+          </div>
+
+          {status.lastParseError ? <p className="muted">Parse warning: {status.lastParseError}</p> : null}
+        </article>
+
         <article className="card">
           <h2>What this is</h2>
           <p>

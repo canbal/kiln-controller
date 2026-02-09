@@ -50,6 +50,39 @@
   white-space: nowrap;
 }
 
+.pillStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 70%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent),
+    0 0 12px color-mix(in srgb, var(--muted) 20%, transparent);
+}
+
+.pillStatus--open .dot {
+  background: rgba(86, 196, 110, 0.9);
+  box-shadow: 0 0 0 1px rgba(86, 196, 110, 0.35), 0 0 14px rgba(86, 196, 110, 0.25);
+}
+
+.pillStatus--connecting .dot,
+.pillStatus--reconnecting .dot {
+  background: rgba(240, 176, 74, 0.95);
+  box-shadow: 0 0 0 1px rgba(240, 176, 74, 0.35), 0 0 14px rgba(240, 176, 74, 0.25);
+}
+
+.pillStatus--closed .dot,
+.pillStatus--error .dot {
+  background: rgba(232, 86, 86, 0.9);
+  box-shadow: 0 0 0 1px rgba(232, 86, 86, 0.35), 0 0 14px rgba(232, 86, 86, 0.2);
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -143,6 +176,12 @@
   font-size: 13px;
 }
 
+.kv.compact {
+  grid-template-columns: 72px 1fr;
+  padding: 7px 9px;
+  margin-top: 0;
+}
+
 .kv .k {
   color: var(--muted);
 }
@@ -150,4 +189,17 @@
 .kv .v {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (min-width: 540px) {
+  .statusGrid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
