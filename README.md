@@ -95,37 +95,23 @@ You may want to change the configuration parameter **sensor_time_wait**. It's th
 
 ### Server Startup
 
-    $ source venv/bin/activate; ./kiln-controller.py
+This project is primarily intended to run on a Raspberry Pi connected to a kiln.
 
-### Raspberry Pi (real kiln / hardware mode)
-
-This is the normal setup when running on the Raspberry Pi connected to your kiln.
-
-1) Install full dependencies on the Pi:
-
-    $ cd kiln-controller
-    $ virtualenv -p python3 venv
-    $ source venv/bin/activate
-    $ export CFLAGS=-fcommon
-    $ pip3 install -r requirements.txt
-
-2) In `config.py`, set `simulate = False` and configure GPIO + thermocouple options for your hardware.
-
-3) Start the server:
+After you've installed dependencies on the Pi (see **Raspberry PI deployment** above), start the server:
 
     $ source venv/bin/activate; ./kiln-controller.py
 
-4) Open:
+Then open:
 
-- `http://<pi-ip>:<listening_port>/picoreflow/index.html`
+    http://<pi-ip>:<listening_port>/picoreflow/index.html
 
-Notes:
-
-- `listening_port` defaults to `80` in this repo; if you keep port 80 you may need to run as root or use a privileged service setup.
+## Development Only (macOS/Linux)
 
 ### Local Development (simulate mode)
 
 If you want to visually test the web UI locally (macOS/Linux) without Raspberry Pi hardware, run in simulation mode.
+
+This is for visual testing and development on non-Raspberry Pi machines without hardware.
 
 1) Create a virtualenv and install local-only deps:
 
