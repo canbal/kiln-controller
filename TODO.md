@@ -32,6 +32,58 @@ To keep work parallelizable and reviewable, follow these conventions:
 - Prefer parallel work by splitting across Workstreams (frontend shell, backend sessions, docs, etc.).
 - Avoid breaking changes and avoid touching `/picoreflow` during migration.
 
+### Local Development (macOS)
+
+Goal: run the server locally without Pi hardware.
+
+1) Create and activate a venv, install deps:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+2) For local mac dev, edit `config.py` (do not commit these local tweaks):
+
+- set `simulate = True` (prevents Raspberry Pi GPIO / thermocouple access)
+- set `listening_port = 8080` (avoids needing sudo for port 80)
+
+3) Run the server:
+
+```bash
+source venv/bin/activate && ./kiln-controller.py
+```
+
+4) Open:
+
+- `http://localhost:8080/picoreflow/index.html`
+- `http://localhost:8080/app`
+
+Notes:
+
+- If you keep `listening_port = 80`, you will likely need `sudo` on macOS.
+- Before deploying to the kiln, ensure `config.py` is set back to your Pi settings.
+
+### Visual Validation Checklist (Human-Reviewed PRs)
+
+Some PRs (especially UI) require a human to visually validate behavior.
+
+Rules:
+
+- Every PR that changes UI or routing must include a PR description checklist using GitHub task list items.
+- The maintainer should check these boxes before merging.
+- Agents should run automated/non-visual validations when possible (lint, unit tests, curl smoke checks), but still ask the maintainer to re-validate visuals.
+
+Suggested PR checklist template:
+
+```md
+## Visual Validation (maintainer)
+- [ ] `/picoreflow/index.html` loads and is functional
+- [ ] `/app` loads on a phone-sized viewport (or device)
+- [ ] No unexpected console errors / server tracebacks
+```
+
 ### Status Legend
 
 - PLANNED: not started
