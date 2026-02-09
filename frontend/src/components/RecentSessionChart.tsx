@@ -29,14 +29,88 @@ type Point = [number, number | null]
 
 type RecentSessionChartProps = {
   tempScale: 'f' | 'c' | null
+  theme?: 'paper' | 'stoneware'
 }
 
-const CHART_TEXT = 'rgba(58, 40, 27, 0.72)'
-const CHART_TEXT_STRONG = 'rgba(58, 40, 27, 0.92)'
-const CHART_LINE = 'rgba(90, 64, 44, 0.22)'
-const CHART_GRID = 'rgba(90, 64, 44, 0.08)'
-const CHART_TOOLTIP_BG = 'rgba(255, 253, 248, 0.98)'
-const CHART_TOOLTIP_BORDER = 'rgba(90, 64, 44, 0.16)'
+type ChartScheme = {
+  text: string
+  textStrong: string
+  line: string
+  grid: string
+  tooltipBg: string
+  tooltipBorder: string
+
+  zoomBg: string
+  zoomBorder: string
+  zoomFill: string
+  zoomHandle: string
+  zoomHandleBorder: string
+
+  seriesActual: string
+  seriesTarget: string
+  seriesTail: string
+
+  markerLine: string
+  markerLabelBg: string
+  markerLabelBorder: string
+  tailShade: string
+  tailLabel: string
+}
+
+function schemeForTheme(theme: 'paper' | 'stoneware'): ChartScheme {
+  if (theme === 'stoneware') {
+    return {
+      text: 'rgba(45, 35, 28, 0.72)',
+      textStrong: 'rgba(45, 35, 28, 0.92)',
+      line: 'rgba(70, 55, 44, 0.22)',
+      grid: 'rgba(70, 55, 44, 0.08)',
+      tooltipBg: 'rgba(251, 248, 242, 0.98)',
+      tooltipBorder: 'rgba(70, 55, 44, 0.16)',
+
+      zoomBg: 'rgba(70, 55, 44, 0.04)',
+      zoomBorder: 'rgba(70, 55, 44, 0.14)',
+      zoomFill: 'rgba(138, 90, 68, 0.10)',
+      zoomHandle: 'rgba(138, 90, 68, 0.40)',
+      zoomHandleBorder: 'rgba(138, 90, 68, 0.22)',
+
+      seriesActual: 'rgba(56, 109, 140, 0.95)',
+      seriesTarget: 'rgba(138, 90, 68, 0.95)',
+      seriesTail: 'rgba(143, 132, 121, 0.92)',
+
+      markerLine: 'rgba(138, 90, 68, 0.85)',
+      markerLabelBg: 'rgba(251, 248, 242, 0.92)',
+      markerLabelBorder: 'rgba(138, 90, 68, 0.25)',
+      tailShade: 'rgba(143, 132, 121, 0.10)',
+      tailLabel: 'rgba(70, 55, 44, 0.62)',
+    }
+  }
+
+  // paper
+  return {
+    text: 'rgba(58, 40, 27, 0.72)',
+    textStrong: 'rgba(58, 40, 27, 0.92)',
+    line: 'rgba(90, 64, 44, 0.22)',
+    grid: 'rgba(90, 64, 44, 0.08)',
+    tooltipBg: 'rgba(255, 253, 248, 0.98)',
+    tooltipBorder: 'rgba(90, 64, 44, 0.16)',
+
+    zoomBg: 'rgba(90, 64, 44, 0.04)',
+    zoomBorder: 'rgba(90, 64, 44, 0.14)',
+    zoomFill: 'rgba(197, 106, 45, 0.10)',
+    zoomHandle: 'rgba(197, 106, 45, 0.40)',
+    zoomHandleBorder: 'rgba(197, 106, 45, 0.22)',
+
+    seriesActual: 'rgba(56, 109, 140, 0.95)',
+    seriesTarget: 'rgba(197, 106, 45, 0.95)',
+    seriesTail: 'rgba(158, 141, 126, 0.92)',
+
+    markerLine: 'rgba(197, 106, 45, 0.85)',
+    markerLabelBg: 'rgba(255, 253, 248, 0.92)',
+    markerLabelBorder: 'rgba(197, 106, 45, 0.25)',
+    tailShade: 'rgba(158, 141, 126, 0.10)',
+    tailLabel: 'rgba(90, 64, 44, 0.62)',
+  }
+}
 
 function fmtAxisTime(ms: number): string {
   const d = new Date(ms)
@@ -96,6 +170,9 @@ function dedupeByT(samples: SessionSample[]): SessionSample[] {
 }
 
 export function RecentSessionChart(props: RecentSessionChartProps) {
+  const theme = props.theme ?? 'paper'
+  const scheme = useMemo(() => schemeForTheme(theme), [theme])
+
   const hostRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<EChartsType | null>(null)
 
@@ -215,14 +292,14 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         left: 0,
         itemWidth: 10,
         itemHeight: 10,
-        textStyle: { color: CHART_TEXT, fontSize: 12 },
+        textStyle: { color: scheme.text, fontSize: 12 },
       },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
-        backgroundColor: CHART_TOOLTIP_BG,
-        borderColor: CHART_TOOLTIP_BORDER,
-        textStyle: { color: CHART_TEXT_STRONG },
+        backgroundColor: scheme.tooltipBg,
+        borderColor: scheme.tooltipBorder,
+        textStyle: { color: scheme.textStrong },
         valueFormatter: (v: unknown) => {
           const u = unitRef.current
           return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
@@ -246,11 +323,11 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           end: 100,
           height: 18,
           bottom: 10,
-          backgroundColor: 'rgba(90, 64, 44, 0.04)',
-          borderColor: 'rgba(90, 64, 44, 0.14)',
-          fillerColor: 'rgba(197, 106, 45, 0.10)',
-          handleStyle: { color: 'rgba(197, 106, 45, 0.40)', borderColor: 'rgba(197, 106, 45, 0.22)' },
-          textStyle: { color: CHART_TEXT },
+          backgroundColor: scheme.zoomBg,
+          borderColor: scheme.zoomBorder,
+          fillerColor: scheme.zoomFill,
+          handleStyle: { color: scheme.zoomHandle, borderColor: scheme.zoomHandleBorder },
+          textStyle: { color: scheme.text },
           zoomOnMouseWheel: 'ctrl',
           moveOnMouseWheel: true,
         },
@@ -259,26 +336,26 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         type: 'time',
         minInterval: 60_000,
         axisLabel: {
-          color: CHART_TEXT,
+          color: scheme.text,
           formatter: (v: number) => fmtAxisTime(v),
           hideOverlap: true,
         },
-        axisLine: { lineStyle: { color: CHART_LINE } },
-        splitLine: { lineStyle: { color: CHART_GRID } },
+        axisLine: { lineStyle: { color: scheme.line } },
+        splitLine: { lineStyle: { color: scheme.grid } },
       },
       yAxis: {
         type: 'value',
         boundaryGap: ['10%', '10%'],
         minInterval: 0.5,
         axisLabel: {
-          color: CHART_TEXT,
+          color: scheme.text,
           formatter: (v: number) => {
             const u = unitRef.current
             return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
           },
         },
-        axisLine: { lineStyle: { color: CHART_LINE } },
-        splitLine: { lineStyle: { color: CHART_GRID } },
+        axisLine: { lineStyle: { color: scheme.line } },
+        splitLine: { lineStyle: { color: scheme.grid } },
       },
       series: [
         {
@@ -286,8 +363,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           type: 'line',
           showSymbol: false,
           data: [] as Point[],
-          itemStyle: { color: 'rgba(56, 109, 140, 0.95)' },
-          lineStyle: { width: 2, color: 'rgba(56, 109, 140, 0.95)' },
+          itemStyle: { color: scheme.seriesActual },
+          lineStyle: { width: 2, color: scheme.seriesActual },
           sampling: 'lttb',
         },
         {
@@ -295,8 +372,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           type: 'line',
           showSymbol: false,
           data: [] as Point[],
-          itemStyle: { color: 'rgba(158, 141, 126, 0.92)' },
-          lineStyle: { width: 2, color: 'rgba(158, 141, 126, 0.92)' },
+          itemStyle: { color: scheme.seriesTail },
+          lineStyle: { width: 2, color: scheme.seriesTail },
           sampling: 'lttb',
         },
         {
@@ -304,8 +381,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           type: 'line',
           showSymbol: false,
           data: [] as Point[],
-          itemStyle: { color: 'rgba(197, 106, 45, 0.95)' },
-          lineStyle: { width: 2, type: 'dashed', color: 'rgba(197, 106, 45, 0.95)' },
+          itemStyle: { color: scheme.seriesTarget },
+          lineStyle: { width: 2, type: 'dashed', color: scheme.seriesTarget },
           sampling: 'lttb',
         },
       ],
@@ -335,7 +412,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       }
       chart.dispose()
     }
-  }, [])
+  }, [scheme])
 
   useEffect(() => {
     const ac = new AbortController()
@@ -496,15 +573,15 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
                 ? {
                     silent: true,
                     symbol: ['none', 'none'],
-                    lineStyle: { color: 'rgba(197, 106, 45, 0.85)', width: 2, type: 'solid' },
+                    lineStyle: { color: scheme.markerLine, width: 2, type: 'solid' },
                     label: {
                       show: true,
                       formatter: endedLabel,
-                      color: 'rgba(197, 106, 45, 0.92)',
+                      color: scheme.markerLine,
                       fontWeight: 800,
                       padding: [2, 6, 2, 6],
-                      backgroundColor: 'rgba(255, 253, 248, 0.92)',
-                      borderColor: 'rgba(197, 106, 45, 0.25)',
+                      backgroundColor: scheme.markerLabelBg,
+                      borderColor: scheme.markerLabelBorder,
                       borderWidth: 1,
                       borderRadius: 8,
                     },
@@ -519,10 +596,10 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
               markArea
                 ? {
                     silent: true,
-                    itemStyle: { color: 'rgba(158, 141, 126, 0.10)' },
+                    itemStyle: { color: scheme.tailShade },
                     label: {
                       show: true,
-                      color: 'rgba(90, 64, 44, 0.62)',
+                      color: scheme.tailLabel,
                       fontWeight: 800,
                       formatter: 'Cooldown tail',
                       position: 'insideTop',
@@ -542,7 +619,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       },
       { notMerge: false, lazyUpdate: true },
     )
-  }, [chartPoints, samples, session])
+  }, [chartPoints, samples, session, scheme])
 
   const endedAt = session && typeof session.ended_at === 'number' ? session.ended_at : null
   const startedAt = session && typeof session.started_at === 'number' ? session.started_at : null

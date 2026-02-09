@@ -1,4 +1,5 @@
 import './App.css'
+import { useEffect, useState } from 'react'
 import { useStatusWs } from './ws/status'
 import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
@@ -102,6 +103,27 @@ function App() {
   const running = oven?.state === 'RUNNING'
   const unit = cfg.tempScale === 'c' ? 'C' : cfg.tempScale === 'f' ? 'F' : ''
 
+  const [theme, setTheme] = useState<'paper' | 'stoneware'>(() => {
+    try {
+      const qp = new URLSearchParams(window.location.search).get('theme')
+      if (qp === 'stoneware' || qp === 'paper') return qp
+      const saved = window.localStorage.getItem('kiln_app_theme')
+      if (saved === 'stoneware' || saved === 'paper') return saved
+    } catch {
+      // ignore
+    }
+    return 'paper'
+  })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      window.localStorage.setItem('kiln_app_theme', theme)
+    } catch {
+      // ignore
+    }
+  }, [theme])
+
   const runtimeS = oven && Number.isFinite(oven.runtime) ? oven.runtime : null
   const wallElapsedS = oven && typeof oven.elapsed === 'number' && Number.isFinite(oven.elapsed) ? oven.elapsed : null
   const totalS = oven && Number.isFinite(oven.totaltime) ? oven.totaltime : null
@@ -125,9 +147,28 @@ function App() {
           <div className="kicker">Kiln Controller</div>
           <h1 className="title">Dashboard</h1>
         </div>
-        <div className={`pill pillStatus pillStatus--${status.connection}`} role="note" aria-label="Status">
-          <span className="dot" aria-hidden="true" />
-          {connectionLabel(status.connection)}
+        <div className="topRight">
+          <div className={`pill pillStatus pillStatus--${status.connection}`} role="note" aria-label="Status">
+            <span className="dot" aria-hidden="true" />
+            {connectionLabel(status.connection)}
+          </div>
+          <div className="pill themePill" role="group" aria-label="Theme">
+            <span className="themeLabel">Theme</span>
+            <button
+              type="button"
+              className={`themeBtn ${theme === 'paper' ? 'isActive' : ''}`}
+              onClick={() => setTheme('paper')}
+            >
+              Paper
+            </button>
+            <button
+              type="button"
+              className={`themeBtn ${theme === 'stoneware' ? 'isActive' : ''}`}
+              onClick={() => setTheme('stoneware')}
+            >
+              Stoneware
+            </button>
+          </div>
         </div>
       </header>
 
@@ -233,7 +274,7 @@ function App() {
             <h2>Live Temperature</h2>
             <div className="cardHeadMeta muted">Actual + target (when RUNNING)</div>
           </div>
-          <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} />
+          <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} theme={theme} />
           <p className="muted chartHint">Scroll/2-finger to pan. Pinch (or ctrl+scroll) to zoom. Drag to pan.</p>
         </article>
 
@@ -242,7 +283,7 @@ function App() {
             <h2>Most Recent Session</h2>
             <div className="cardHeadMeta muted">Cooling tail + end marker</div>
           </div>
-          <RecentSessionChart tempScale={cfg.tempScale} />
+          <RecentSessionChart tempScale={cfg.tempScale} theme={theme} />
         </article>
 
         <article className="card">

@@ -1,6 +1,17 @@
 :root {
-  /* Light theme, solid background (no textures/gradients). */
-  /* Warmer paper palette (kiln/clay vibe). */
+  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 500;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Theme tokens (solid background; no textures/gradients). */
+:root,
+:root[data-theme='paper'] {
+  /* Paper (warm studio paper + terracotta accent). */
   --bg0: #fbf7f0;
   --bg1: #fbf7f0;
   --card: #fffdf8;
@@ -12,14 +23,21 @@
   /* Lines and accents */
   --line: rgba(90, 64, 44, 0.16);
   --accent: #c56a2d;
+}
 
-  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 500;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+:root[data-theme='stoneware'] {
+  /* Stoneware (cooler clay body + iron/umber accent). */
+  --bg0: #f3efe7;
+  --bg1: #f3efe7;
+  --card: #fbf8f2;
+
+  /* Ink */
+  --text: rgba(45, 35, 28, 0.92);
+  --muted: rgba(45, 35, 28, 0.62);
+
+  /* Lines and accents */
+  --line: rgba(70, 55, 44, 0.18);
+  --accent: #8a5a44;
 }
 
 * {
