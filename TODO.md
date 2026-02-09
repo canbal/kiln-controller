@@ -226,13 +226,13 @@ Rules:
 
 ### Milestone 0: Docs Only (Contracts + Fixtures)
 
-- [ ] `T-0001` Add `docs/contracts.md` covering `/status`, `/control`, `/storage`, `/config`, `/api`
--  - status: IN_PROGRESS
--  - owner: @opencode
+- [x] `T-0001` Add `docs/contracts.md` covering `/status`, `/control`, `/storage`, `/config`, `/api`
+  - status: DONE
+  - owner: @opencode
   - deps:
   - acceptance: `docs/contracts.md` includes example JSON payloads and units
   - PR: https://github.com/canbal/kiln-controller/pull/1
-  - commit:
+  - commit: a2126dd94ea50cf10c67f8036c66dbfc4575d6aa
 
 - [ ] `T-0002` Add fixture JSON for `/status` backlog + steady-state messages
   - status: PLANNED
