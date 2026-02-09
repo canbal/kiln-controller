@@ -48,9 +48,16 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
   const [followLive, setFollowLive] = useState(true)
   const followLiveRef = useRef(true)
+  const [autoLiveWindow, setAutoLiveWindow] = useState(true)
   const programmaticZoomRef = useRef(false)
   const zoomSpanPctRef = useRef(20)
   const lockedRangeRef = useRef<{ startValue: number; endValue: number } | null>(null)
+
+  // Default live view behavior:
+  // - until we have >= LIVE_WINDOW_MS of data, show the full extent (max zoomed out)
+  // - after that, lock the window to exactly LIVE_WINDOW_MS and pan with new data
+  // If the user manually zooms/pans, we stop enforcing this until they hit Reset.
+  const autoLiveWindowRef = useRef(true)
 
   const seededRef = useRef(false)
   const lastPointAtRef = useRef<number | null>(null)
@@ -58,6 +65,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const targetRef = useRef<Point[]>([])
 
   const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
+  const LIVE_WINDOW_MS = 30 * 60 * 1000
 
   const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
   const unitRef = useRef(unit)
@@ -104,12 +112,83 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const chart = chartRef.current
     followLiveRef.current = true
     setFollowLive(true)
+    setAutoLiveWindow(true)
     if (!chart) return
 
     zoomSpanPctRef.current = 20
     lockedRangeRef.current = null
+    autoLiveWindowRef.current = true
+
     programmaticZoomRef.current = true
-    chart.dispatchAction({ type: 'dataZoom', start: 80, end: 100 })
+    // Apply the default live window behavior immediately.
+    const extent = timeExtent()
+    if (extent) {
+      const span = extent.max - extent.min
+      if (span < LIVE_WINDOW_MS) {
+        chart.setOption(
+          {
+            dataZoom: [
+              { rangeMode: ['percent', 'percent'], start: 0, end: 100 },
+              { rangeMode: ['percent', 'percent'], start: 0, end: 100 },
+            ],
+          },
+          { notMerge: false, lazyUpdate: true },
+        )
+      } else {
+        const endValue = extent.max
+        const startValue = endValue - LIVE_WINDOW_MS
+        chart.setOption(
+          {
+            dataZoom: [
+              { rangeMode: ['value', 'value'], startValue, endValue },
+              { rangeMode: ['value', 'value'], startValue, endValue },
+            ],
+          },
+          { notMerge: false, lazyUpdate: true },
+        )
+      }
+    } else {
+      chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
+    }
+    window.setTimeout(() => {
+      programmaticZoomRef.current = false
+    }, 0)
+  }
+
+  const applyAutoLiveWindow = (chart: EChartsType) => {
+    const extent = timeExtent()
+    if (!extent) return
+
+    const span = extent.max - extent.min
+    if (span < LIVE_WINDOW_MS) {
+      programmaticZoomRef.current = true
+      chart.setOption(
+        {
+          dataZoom: [
+            { rangeMode: ['percent', 'percent'], start: 0, end: 100 },
+            { rangeMode: ['percent', 'percent'], start: 0, end: 100 },
+          ],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+      window.setTimeout(() => {
+        programmaticZoomRef.current = false
+      }, 0)
+      return
+    }
+
+    const endValue = extent.max
+    const startValue = endValue - LIVE_WINDOW_MS
+    programmaticZoomRef.current = true
+    chart.setOption(
+      {
+        dataZoom: [
+          { rangeMode: ['value', 'value'], startValue, endValue },
+          { rangeMode: ['value', 'value'], startValue, endValue },
+        ],
+      },
+      { notMerge: false, lazyUpdate: true },
+    )
     window.setTimeout(() => {
       programmaticZoomRef.current = false
     }, 0)
@@ -215,6 +294,10 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const onDataZoom = () => {
       if (programmaticZoomRef.current) return
 
+      // Any manual dataZoom interaction disables the default auto live window.
+      autoLiveWindowRef.current = false
+      if (autoLiveWindow) setAutoLiveWindow(false)
+
       // Keep following live only if the window end is "now".
       // If the user pans away (end < ~100%), stop following until reset.
       const win = readZoomWindowPct(chart)
@@ -308,6 +391,11 @@ export function LiveTempChart(props: LiveTempChartProps) {
       },
       { notMerge: false, lazyUpdate: true },
     )
+
+    // Start in the correct zoom state immediately after seeding.
+    if (followLiveRef.current && autoLiveWindowRef.current) {
+      applyAutoLiveWindow(chartRef.current)
+    }
   }, [props.backlog, maxPoints])
 
   useEffect(() => {
@@ -334,30 +422,34 @@ export function LiveTempChart(props: LiveTempChartProps) {
     )
 
     if (followLiveRef.current) {
-      // Preserve current zoom level; pin it to the live edge.
-      const win = readZoomWindowPct(chart)
-      if (win) {
-        const span = Math.max(0, Math.min(100, win.endPct - win.startPct))
-        if (span > 0) zoomSpanPctRef.current = span
+      if (autoLiveWindowRef.current) {
+        applyAutoLiveWindow(chart)
+      } else {
+        // Preserve current zoom level; pin it to the live edge.
+        const win = readZoomWindowPct(chart)
+        if (win) {
+          const span = Math.max(0, Math.min(100, win.endPct - win.startPct))
+          if (span > 0) zoomSpanPctRef.current = span
+        }
+
+        const nextEnd = 100
+        const nextStart = Math.max(0, nextEnd - zoomSpanPctRef.current)
+
+        programmaticZoomRef.current = true
+        // Force percent mode so a prior locked value-range doesn't fall back to defaults.
+        chart.setOption(
+          {
+            dataZoom: [
+              { rangeMode: ['percent', 'percent'], start: nextStart, end: nextEnd },
+              { rangeMode: ['percent', 'percent'], start: nextStart, end: nextEnd },
+            ],
+          },
+          { notMerge: false, lazyUpdate: true },
+        )
+        window.setTimeout(() => {
+          programmaticZoomRef.current = false
+        }, 0)
       }
-
-      const nextEnd = 100
-      const nextStart = Math.max(0, nextEnd - zoomSpanPctRef.current)
-
-      programmaticZoomRef.current = true
-      // Force percent mode so a prior locked value-range doesn't fall back to defaults.
-      chart.setOption(
-        {
-          dataZoom: [
-            { rangeMode: ['percent', 'percent'], start: nextStart, end: nextEnd },
-            { rangeMode: ['percent', 'percent'], start: nextStart, end: nextEnd },
-          ],
-        },
-        { notMerge: false, lazyUpdate: true },
-      )
-      window.setTimeout(() => {
-        programmaticZoomRef.current = false
-      }, 0)
     } else {
       // Re-apply locked absolute range after data updates.
       const locked = lockedRangeRef.current
@@ -381,7 +473,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
   return (
     <div className="liveChartWrap" aria-label="Live temperature chart">
-      {!followLive ? (
+      {!followLive || !autoLiveWindow ? (
         <button type="button" className="chartReset" onClick={resetToLive} aria-label="Reset chart to live view">
           Reset
         </button>
