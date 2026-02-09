@@ -15,6 +15,7 @@ To keep work parallelizable and reviewable, follow these conventions:
 - One agent should work on exactly one Task ID.
 - One PR should implement one Task ID.
 - Always work on a branch and use PRs; do not push directly to the default branch (`master`/`main`).
+- Agents should open PRs proactively once a task's implementation is complete and local verification passes; do not wait for the maintainer to explicitly instruct "open a PR".
 - Every PR must be reviewed by the human maintainer before it is merged.
   - Agents must not merge PRs on their own.
   - Wait for an explicit maintainer message containing the word "merge" for that PR before merging.

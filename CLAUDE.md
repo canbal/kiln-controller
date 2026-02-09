@@ -42,6 +42,23 @@ Edit `watcher.py` with your kiln URL and Slack webhook, then:
 ./watcher.py
 ```
 
+## GitHub CLI Notes (PR Editing)
+
+In this repo, `gh pr edit` can fail due to GitHub Projects (classic) deprecation.
+The GitHub CLI may query the deprecated `projectCards` field via GraphQL, which returns an error and prevents edits.
+
+Workaround: use the REST API through `gh api` to edit PR metadata (body/title).
+
+Examples:
+
+```bash
+# Update PR body from a file (preserves real newlines)
+gh api -X PATCH repos/{owner}/{repo}/pulls/33 -F body=@/tmp/pr-body.md
+
+# Update PR title
+gh api -X PATCH repos/{owner}/{repo}/pulls/33 -f title='New title'
+```
+
 ## Architecture
 
 ### Core Components
