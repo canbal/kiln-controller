@@ -423,7 +423,7 @@ Rules:
   - owner: @opencode
   - deps: `T-0202`
   - acceptance: `/app` shows progress %, elapsed time, and estimated time remaining when RUNNING
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/31
   - commit:
 
 ### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)
