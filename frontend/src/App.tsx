@@ -1,5 +1,6 @@
 import './App.css'
 import { useStatusWs } from './ws/status'
+import { LiveTempChart } from './components/LiveTempChart'
 
 function formatTime(d: Date | null): string {
   if (!d) return 'never'
@@ -150,6 +151,15 @@ function App() {
               <span className="stripV">{status.lastMessageValid ? 'yes' : 'no'}</span>
             </div>
           </div>
+        </article>
+
+        <article className="card card--span2" aria-label="Chart">
+          <div className="cardHead">
+            <h2>Live Temperature</h2>
+            <div className="cardHeadMeta muted">Actual + target (when RUNNING)</div>
+          </div>
+          <LiveTempChart state={status.state} backlog={status.backlog} />
+          <p className="muted chartHint">Pinch/scroll to zoom. Drag to pan.</p>
         </article>
 
         <article className="card">
