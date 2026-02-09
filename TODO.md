@@ -273,6 +273,37 @@ Notes:
 - Keep migrations minimal. Store a schema version in a table (e.g. `schema_version`).
 - Do not store secrets.
 
+## Notes: Time Series Storage + Performance (Future)
+
+We currently store one sample per control loop cycle as the full `Oven.get_state()` JSON payload.
+This is intentionally simple and additive, but long sessions (e.g. 20h @ 1Hz ~= 72k samples) can become expensive to:
+
+- parse on the server (JSON decode per row)
+- transfer to the browser (large payloads)
+- render on the client (tens of thousands of points)
+
+If/when this becomes a real performance problem, prefer keeping SQLite and reducing CPU/payload first.
+Options (roughly in recommended order):
+
+1) Denormalize chart scalars in `session_samples`
+   - Add numeric columns such as `temperature`, `target`, `heat`, `oven_state` alongside `state_json`.
+   - Keep `state_json` for compatibility/debugging.
+   - Charts and REST endpoints can read only the scalar columns to avoid JSON parsing.
+
+2) Add a new "thin" series endpoint (keep existing endpoints stable)
+   - Example: `GET /v1/sessions/:id/series?from=&to=&limit=&fields=temp,target`
+   - Return compact arrays (e.g. `points: [[t,temp,target], ...]`) to reduce payload + JS object overhead.
+   - Keep existing `GET /v1/sessions/:id/samples` shape unchanged.
+
+3) Server-side downsampling for wide views
+   - When the UI requests a large time window, downsample to a fixed point budget (e.g. 2k-5k points)
+     using LTTB or min/max-per-bucket.
+   - Fetch full resolution only when zoomed in.
+
+4) Consider a TSDB only if SQLite becomes the bottleneck
+   - Candidates: InfluxDB, VictoriaMetrics (single binary), TimescaleDB (heavier).
+   - Tradeoff: improved compression/querying vs additional daemon/ops complexity.
+
 ## New Backend API (Additive)
 
 New endpoints are additive and versioned. Do not remove or change old ones.
