@@ -4,6 +4,9 @@ import { useStatusWs } from './ws/status'
 import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
 import { RecentSessionChart } from './components/RecentSessionChart'
+import { SessionDetailPage } from './pages/SessionDetailPage'
+import { SessionsListPage } from './pages/SessionsListPage'
+import { appHref, useAppRoute } from './router'
 type UiTheme = 'stoneware' | 'dark'
 
 function formatTime(d: Date | null): string {
@@ -100,6 +103,7 @@ function stateLabel(s: string | null | undefined): string {
 function App() {
   const status = useStatusWs()
   const cfg = useConfigWs()
+  const { route } = useAppRoute()
   const oven = status.state
   const running = oven?.state === 'RUNNING'
   const unit = cfg.tempScale === 'c' ? 'C' : cfg.tempScale === 'f' ? 'F' : ''
@@ -151,12 +155,32 @@ function App() {
       ? oven.cooldown_elapsed
       : null
 
+  const pageTitle =
+    route.kind === 'dashboard'
+      ? 'Dashboard'
+      : route.kind === 'sessions'
+        ? 'Sessions'
+        : route.kind === 'session_detail'
+          ? 'Session'
+          : 'Not Found'
+
   return (
     <main className="app">
       <header className="top">
         <div>
           <div className="kicker">Kiln Controller</div>
-          <h1 className="title">Dashboard</h1>
+          <h1 className="title">{pageTitle}</h1>
+          <nav className="nav" aria-label="App navigation">
+            <a className={`navLink ${route.kind === 'dashboard' ? 'navLink--active' : ''}`} href={appHref('/dashboard')}>
+              Dashboard
+            </a>
+            <a
+              className={`navLink ${route.kind === 'sessions' || route.kind === 'session_detail' ? 'navLink--active' : ''}`}
+              href={appHref('/sessions')}
+            >
+              Sessions
+            </a>
+          </nav>
         </div>
         <div className="topRight">
           <div className={`pill pillStatus pillStatus--${status.connection}`} role="note" aria-label="Status">
@@ -194,7 +218,8 @@ function App() {
         </div>
       </header>
 
-      <section className="grid" aria-label="Cards">
+      {route.kind === 'dashboard' ? (
+        <section className="grid" aria-label="Cards">
         <article className="card card--span2" aria-label="Metrics">
           <h2>Live Metrics</h2>
 
@@ -336,9 +361,9 @@ function App() {
         <article className="card">
           <h2>Next steps</h2>
           <ol className="list">
-            <li>WebSocket client for <code>/status</code> with reconnect + validation.</li>
-            <li>Mobile-first dashboard metrics.</li>
-            <li>Live chart with target + actual temperature.</li>
+            <li>Browse sessions under <code>Sessions</code>.</li>
+            <li>Add notes to completed firings.</li>
+            <li>(Later) per-session chart and export.</li>
           </ol>
         </article>
 
@@ -357,7 +382,27 @@ function App() {
             <div className="v">{window.location.pathname}</div>
           </div>
         </article>
-      </section>
+        </section>
+      ) : route.kind === 'sessions' ? (
+        <SessionsListPage />
+      ) : route.kind === 'session_detail' ? (
+        <SessionDetailPage sessionId={route.sessionId} />
+      ) : (
+        <section className="sessions" aria-label="Not found">
+          <article className="card">
+            <h2>Not found</h2>
+            <p className="muted">That page does not exist in the new UI.</p>
+            <div className="actions">
+              <a className="btn primary" href={appHref('/dashboard')}>
+                Go to dashboard
+              </a>
+              <a className="btn" href={appHref('/sessions')}>
+                Go to sessions
+              </a>
+            </div>
+          </article>
+        </section>
+      )}
     </main>
   )
 }
