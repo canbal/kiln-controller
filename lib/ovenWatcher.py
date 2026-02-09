@@ -72,20 +72,27 @@ class OvenWatcher(threading.Thread):
         try:
             print(backlog_json)
             observer.send(backlog_json)
-        except:
-            log.error("Could not send backlog to new observer")
+        except Exception:
+            # Normal in practice: client can disconnect while connecting/refreshing.
+            log.debug("backlog send failed; observer likely disconnected", exc_info=True)
+            log.warning("Could not send backlog to new observer (likely disconnected)")
         
         self.observers.append(observer)
 
     def notify_all(self,message):
         message_json = json.dumps(message)
         log.debug("sending to %d clients: %s"%(len(self.observers),message_json))
-        for wsock in self.observers:
+        # Iterate over a copy since we may drop disconnected observers.
+        for wsock in list(self.observers):
             if wsock:
                 try:
                     wsock.send(message_json)
-                except:
-                    log.error("could not write to socket %s"%wsock)
-                    self.observers.remove(wsock)
+                except Exception:
+                    # This is usually a client refresh/close; drop the observer and continue.
+                    log.debug("websocket send failed; dropping observer %s" % wsock, exc_info=True)
+                    log.warning("websocket client disconnected; dropping observer %s" % wsock)
+                    if wsock in self.observers:
+                        self.observers.remove(wsock)
             else:
-                self.observers.remove(wsock)
+                if wsock in self.observers:
+                    self.observers.remove(wsock)
