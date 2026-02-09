@@ -155,7 +155,13 @@ export function LiveTempChart(props: LiveTempChartProps) {
       ],
       xAxis: {
         type: 'time',
-        axisLabel: { color: 'rgba(255,255,255,0.70)', formatter: (v: number) => fmtAxisTime(v) },
+        // Prevent duplicate labels like 06:51 06:51 06:51 when the axis ticks are < 1 minute.
+        minInterval: 60_000,
+        axisLabel: {
+          color: 'rgba(255,255,255,0.70)',
+          formatter: (v: number) => fmtAxisTime(v),
+          hideOverlap: true,
+        },
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
         splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
       },
