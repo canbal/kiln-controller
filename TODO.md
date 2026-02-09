@@ -238,12 +238,12 @@ Rules:
   - commit: a2126dd94ea50cf10c67f8036c66dbfc4575d6aa
 
 - [ ] `T-0002` Add fixture JSON for `/status` backlog + steady-state messages
-  - status: IN_PROGRESS
+  - status: DONE
   - owner: @opencode
   - deps: `T-0001`
   - acceptance: fixtures exist and are referenced by docs/tests later
   - PR: https://github.com/canbal/kiln-controller/pull/5
-  - commit:
+  - commit: b4996e65319d81436cbfcd5f7d5ebc967b918d01
 
 - [ ] `T-0003` Add fixture JSON for `/api/stats` payload
   - status: PLANNED
