@@ -36,6 +36,14 @@ function fmtAxisTime(ms: number): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function fmtTemp(v: number): string {
+  if (!Number.isFinite(v)) return '--'
+  const rounded = Math.round(v)
+  if (Math.abs(v - rounded) < 0.05) return String(rounded)
+  const s = v.toFixed(1)
+  return s.endsWith('.0') ? s.slice(0, -2) : s
+}
+
 function fmtDateTime(tsSec: number | null): string {
   if (tsSec === null) return '--'
   const d = new Date(tsSec * 1000)
@@ -91,6 +99,12 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
   const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
   const unitRef = useRef(unit)
+
+  const seriesDataRef = useRef<[Point[], Point[], Point[]]>([[], [], []])
+  const timeExtentMsRef = useRef<{ min: number; max: number } | null>(null)
+  const scheduleYAxisAutorangeRef = useRef<(() => void) | null>(null)
+  const lastAppliedYRef = useRef<{ min: number; max: number } | null>(null)
+  const yAutorangeRafRef = useRef<number | null>(null)
   useEffect(() => {
     unitRef.current = unit
   }, [unit])
@@ -101,6 +115,90 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
     const chart = echarts.init(host, undefined, { renderer: 'canvas' })
     chartRef.current = chart
+
+    const readZoomWindowValues = (): { startValue: number; endValue: number } | null => {
+      const opt = chart.getOption()
+      const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as Record<string, unknown> | undefined) : undefined
+      if (!zoom0) return null
+
+      const startValue = typeof zoom0.startValue === 'number' ? zoom0.startValue : null
+      const endValue = typeof zoom0.endValue === 'number' ? zoom0.endValue : null
+      if (startValue !== null && endValue !== null) return { startValue, endValue }
+
+      const start = typeof zoom0.start === 'number' ? zoom0.start : null
+      const end = typeof zoom0.end === 'number' ? zoom0.end : null
+      if (start === null || end === null) return null
+      const extent = timeExtentMsRef.current
+      if (!extent) return null
+      const min = extent.min
+      const max = extent.max
+      if (!(max > min)) return null
+      const toValue = (pct: number) => min + ((max - min) * pct) / 100
+      return { startValue: toValue(start), endValue: toValue(end) }
+    }
+
+    const computeVisibleYRange = (): { min: number; max: number } | null => {
+      const win = readZoomWindowValues()
+      if (!win) return null
+
+      let minY = Number.POSITIVE_INFINITY
+      let maxY = Number.NEGATIVE_INFINITY
+
+      const scan = (pts: Point[]) => {
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i]
+          const t = p[0]
+          const y = p[1]
+          if (t < win.startValue || t > win.endValue) continue
+          if (y === null) continue
+          if (!Number.isFinite(y)) continue
+          if (y < minY) minY = y
+          if (y > maxY) maxY = y
+        }
+      }
+
+      const [s0, s1, s2] = seriesDataRef.current
+      scan(s0)
+      scan(s1)
+      scan(s2)
+
+      if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return null
+      let span = maxY - minY
+      if (!(span > 0)) span = 1
+      const pad = Math.max(1, span * 0.08)
+      const min = Math.max(0, minY - pad)
+      const max = maxY + pad
+      if (max - min < 2) {
+        const mid = (max + min) / 2
+        return { min: Math.max(0, mid - 1), max: mid + 1 }
+      }
+      return { min, max }
+    }
+
+    const scheduleYAxisAutorange = () => {
+      if (yAutorangeRafRef.current !== null) return
+      yAutorangeRafRef.current = window.requestAnimationFrame(() => {
+        yAutorangeRafRef.current = null
+        const next = computeVisibleYRange()
+        if (!next) return
+        const prev = lastAppliedYRef.current
+        const changed =
+          !prev || Math.abs(prev.min - next.min) > 0.25 || Math.abs(prev.max - next.max) > 0.25
+        if (!changed) return
+        lastAppliedYRef.current = next
+        chart.setOption(
+          {
+            yAxis: {
+              min: next.min,
+              max: next.max,
+            },
+          },
+          { notMerge: false, lazyUpdate: true },
+        )
+      })
+    }
+
+    scheduleYAxisAutorangeRef.current = scheduleYAxisAutorange
 
     const base = {
       animation: false,
@@ -120,7 +218,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         textStyle: { color: 'rgba(255,255,255,0.92)' },
         valueFormatter: (v: unknown) => {
           const u = unitRef.current
-          return typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v)}°${u}` : '--'
+          return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
         },
       },
       dataZoom: [
@@ -153,11 +251,12 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       yAxis: {
         type: 'value',
         boundaryGap: ['10%', '10%'],
+        minInterval: 0.5,
         axisLabel: {
           color: 'rgba(255,255,255,0.70)',
           formatter: (v: number) => {
             const u = unitRef.current
-            return Number.isFinite(v) ? `${Math.round(v)}°${u}` : '--'
+            return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
           },
         },
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
@@ -196,6 +295,12 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
     chart.setOption(base, { notMerge: true })
 
+    const onDataZoom = () => {
+      scheduleYAxisAutorange()
+    }
+
+    chart.on('dataZoom', onDataZoom)
+
     const ro = new ResizeObserver(() => {
       chart.resize({ animation: { duration: 0 } })
     })
@@ -203,7 +308,13 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
     return () => {
       ro.disconnect()
+      chart.off('dataZoom', onDataZoom)
       chartRef.current = null
+      scheduleYAxisAutorangeRef.current = null
+      if (yAutorangeRafRef.current !== null) {
+        window.cancelAnimationFrame(yAutorangeRafRef.current)
+        yAutorangeRafRef.current = null
+      }
       chart.dispose()
     }
   }, [])
@@ -333,6 +444,17 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
     return { actualProfile, actualCooldown, target, endMs }
   }, [samples, session])
+
+  useEffect(() => {
+    seriesDataRef.current = [chartPoints.actualProfile, chartPoints.actualCooldown, chartPoints.target]
+    const firstMs = samples.length ? samples[0]!.t * 1000 : null
+    const lastMs = samples.length ? samples[samples.length - 1]!.t * 1000 : null
+    timeExtentMsRef.current = firstMs !== null && lastMs !== null && lastMs > firstMs ? { min: firstMs, max: lastMs } : null
+
+    // Re-fit y-axis when data changes (initial load / session switch).
+    lastAppliedYRef.current = null
+    scheduleYAxisAutorangeRef.current?.()
+  }, [chartPoints, samples])
 
   useEffect(() => {
     const chart = chartRef.current
