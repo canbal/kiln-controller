@@ -420,13 +420,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/23
   - commit: 3055636d96cc641ce14de0bd9a9098f4b4cf379f
 
-- [ ] `T-0302` Create/stop sessions automatically on run start/stop (server-driven)
-  - status: IN_PROGRESS
+- [x] `T-0302` Create/stop sessions automatically on run start/stop (server-driven)
+  - status: DONE
   - owner: @opencode
   - deps: `T-0301`
   - acceptance: starting a run creates a session row with profile_name
   - PR: https://github.com/canbal/kiln-controller/pull/25
-  - commit:
+  - commit: 3b85d4480caef487a22c09ad3431e78b27dac706
 
 - [ ] `T-0303` Persist one sample per control loop (`sensor_time_wait`) with full `Oven.get_state()` JSON
   - status: PLANNED
