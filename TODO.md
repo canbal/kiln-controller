@@ -449,7 +449,7 @@ Rules:
   - owner: @opencode
   - deps: `T-0303`
   - acceptance: post-profile cooling samples exist and stop at <200F/93C (or 48h)
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/30
   - commit:
 
 ### Milestone 4: Cooling Tail Visualization (Early Feature)
