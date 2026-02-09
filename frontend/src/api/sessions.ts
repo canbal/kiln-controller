@@ -17,20 +17,43 @@ async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
       Accept: 'application/json',
     },
   })
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase()
   const txt = await res.text()
-  let json: unknown
-  try {
-    json = txt ? JSON.parse(txt) : null
-  } catch {
-    throw new Error(`Non-JSON response from ${path} (status ${res.status})`)
+
+  const looksJson = (() => {
+    const t = txt.trimStart()
+    return t.startsWith('{') || t.startsWith('[')
+  })()
+
+  let json: unknown = null
+  if (txt && (contentType.includes('application/json') || looksJson)) {
+    try {
+      json = JSON.parse(txt)
+    } catch {
+      // Keep json=null; we'll raise a clear error below.
+      json = null
+    }
   }
+
   if (!res.ok) {
-    const msg =
-      typeof json === 'object' && json !== null && 'error' in json
-        ? String((json as Record<string, unknown>).error)
-        : `HTTP_${res.status}`
-    throw new Error(msg)
+    const errorFromJson =
+      typeof json === 'object' && json !== null && 'error' in json ? String((json as Record<string, unknown>).error) : null
+
+    if (errorFromJson) throw new Error(errorFromJson)
+
+    if (res.status === 404) {
+      throw new Error(`HTTP_404: endpoint not found at ${path} (expected /v1/* REST endpoints)`)
+    }
+
+    throw new Error(`HTTP_${res.status} from ${path}`)
   }
+
+  if (json === null) {
+    const ct = contentType ? ` (${contentType})` : ''
+    throw new Error(`Expected JSON from ${path}${ct}`)
+  }
+
   return json
 }
 

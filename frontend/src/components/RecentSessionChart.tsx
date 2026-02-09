@@ -419,6 +419,14 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
   const endedState = session?.outcome ?? '--'
 
+  const endpointHint = useMemo(() => {
+    if (!error) return null
+    if (error.includes('HTTP_404') || error.includes('Expected JSON')) {
+      return `Try: curl ${window.location.origin}/v1/sessions`
+    }
+    return null
+  }, [error])
+
   return (
     <div className="recentSession" aria-label="Most recent session">
       <div className="recentSessionMeta">
@@ -451,7 +459,17 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       </div>
 
       {loading ? <p className="muted">Loading most recent session…</p> : null}
-      {error ? <p className="muted">Session chart error: {error}</p> : null}
+      {error ? (
+        <p className="muted">
+          Session chart error: {error}
+          {endpointHint ? (
+            <>
+              <br />
+              <span className="muted">{endpointHint}</span>
+            </>
+          ) : null}
+        </p>
+      ) : null}
       {!loading && !error && !samples.length ? <p className="muted">No samples available for this session.</p> : null}
 
       <div className="liveChartWrap" aria-label="Session temperature chart">
