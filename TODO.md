@@ -262,11 +262,11 @@ Rules:
 ### Milestone 1: New UI Shell (Complementary, Read-Only)
 
 - [ ] `T-0101` Add `/app` route that serves new static UI without touching `/picoreflow`
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0001`
   - acceptance: `/picoreflow/index.html` still loads; `/app` loads on phone
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/10
   - commit:
 
 - [ ] `T-0102` Create `frontend/` React+TS+Vite skeleton and produce committed build output in `public/app/`
