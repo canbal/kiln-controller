@@ -67,6 +67,31 @@ export function LiveTempChart(props: LiveTempChartProps) {
     return { min, max }
   }
 
+  const readZoomWindowPct = (chart: EChartsType): { startPct: number; endPct: number } | null => {
+    const opt = chart.getOption()
+    const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as Record<string, unknown> | undefined) : undefined
+    if (!zoom0) return null
+
+    const start = typeof zoom0.start === 'number' ? zoom0.start : null
+    const end = typeof zoom0.end === 'number' ? zoom0.end : null
+    if (start !== null && end !== null) {
+      return { startPct: Math.max(0, Math.min(100, start)), endPct: Math.max(0, Math.min(100, end)) }
+    }
+
+    const extent = timeExtent()
+    const startValue = typeof zoom0.startValue === 'number' ? zoom0.startValue : null
+    const endValue = typeof zoom0.endValue === 'number' ? zoom0.endValue : null
+    if (!extent || startValue === null || endValue === null) return null
+
+    const toPct = (v: number) => ((v - extent.min) / (extent.max - extent.min)) * 100
+    const startPct = toPct(startValue)
+    const endPct = toPct(endValue)
+    return {
+      startPct: Math.max(0, Math.min(100, startPct)),
+      endPct: Math.max(0, Math.min(100, endPct)),
+    }
+  }
+
   const resetToLive = () => {
     const chart = chartRef.current
     followLiveRef.current = true
@@ -168,14 +193,13 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
       // Keep following live only if the window end is "now".
       // If the user pans away (end < ~100%), stop following until reset.
-      const opt = chart.getOption()
-      const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as { start?: number; end?: number } | undefined) : undefined
-      const start = typeof zoom0?.start === 'number' ? zoom0.start : 80
-      const end = typeof zoom0?.end === 'number' ? zoom0.end : 100
-      const span = Math.max(0, Math.min(100, end - start))
+      const win = readZoomWindowPct(chart)
+      const startPct = win ? win.startPct : 80
+      const endPct = win ? win.endPct : 100
+      const span = Math.max(0, Math.min(100, endPct - startPct))
 
       // When zoomed/panned but still at the live edge, preserve the zoom level.
-      if (end >= 99.5) {
+      if (endPct >= 99.5) {
         zoomSpanPctRef.current = span
         lockedRangeRef.current = null
         if (!followLiveRef.current) {
@@ -192,8 +216,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
       const extent = timeExtent()
       if (!extent) return
       const toValue = (pct: number) => extent.min + ((extent.max - extent.min) * pct) / 100
-      const startValue = toValue(start)
-      const endValue = toValue(end)
+      const startValue = toValue(startPct)
+      const endValue = toValue(endPct)
       lockedRangeRef.current = { startValue, endValue }
 
       programmaticZoomRef.current = true
@@ -287,18 +311,26 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     if (followLiveRef.current) {
       // Preserve current zoom level; pin it to the live edge.
-      const opt = chart.getOption()
-      const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as { start?: number; end?: number } | undefined) : undefined
-      const start = typeof zoom0?.start === 'number' ? zoom0.start : 80
-      const end = typeof zoom0?.end === 'number' ? zoom0.end : 100
-      const span = Math.max(0, Math.min(100, end - start))
-      if (span > 0) zoomSpanPctRef.current = span
+      const win = readZoomWindowPct(chart)
+      if (win) {
+        const span = Math.max(0, Math.min(100, win.endPct - win.startPct))
+        if (span > 0) zoomSpanPctRef.current = span
+      }
 
       const nextEnd = 100
       const nextStart = Math.max(0, nextEnd - zoomSpanPctRef.current)
 
       programmaticZoomRef.current = true
-      chart.dispatchAction({ type: 'dataZoom', start: nextStart, end: nextEnd })
+      // Force percent mode so a prior locked value-range doesn't fall back to defaults.
+      chart.setOption(
+        {
+          dataZoom: [
+            { rangeMode: ['percent', 'percent'], start: nextStart, end: nextEnd },
+            { rangeMode: ['percent', 'percent'], start: nextStart, end: nextEnd },
+          ],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
       window.setTimeout(() => {
         programmaticZoomRef.current = false
       }, 0)
