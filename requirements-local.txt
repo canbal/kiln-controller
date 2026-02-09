@@ -4,3 +4,4 @@ bottle
 gevent
 gevent-websocket
 websocket-client
+rich

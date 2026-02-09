@@ -37,10 +37,28 @@ if port_env:
     except Exception:
         port_env_invalid = True
 
-logging.basicConfig(level=config.log_level, format=config.log_format)
+_dev_mode = (os.environ.get('DEVELOPMENT') == '1')
+
+# Prefer colored, readable logs in local dev only.
+# This is additive and safe: if Rich isn't installed, it falls back to std logging.
+if _dev_mode:
+    try:
+        from rich.logging import RichHandler
+
+        logging.basicConfig(
+            level=config.log_level,
+            format="%(message)s",
+            datefmt="[%X]",
+            handlers=[RichHandler(rich_tracebacks=True)],
+        )
+    except Exception:
+        logging.basicConfig(level=config.log_level, format=config.log_format)
+else:
+    logging.basicConfig(level=config.log_level, format=config.log_format)
+
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
-if os.environ.get('DEVELOPMENT') == '1':
+if _dev_mode:
     log.info("DEVELOPMENT=1 set: forcing simulate=True")
 if port_env:
     if port_env_invalid:

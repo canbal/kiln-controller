@@ -537,3 +537,4 @@ Operational:
 ## Change Log
 
 - 2026-02-08: initial plan added (commit `e223b48`)
+- 2026-02-09: local dev logging uses Rich when `DEVELOPMENT=1`
