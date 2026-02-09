@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import time
+import uuid
+import json
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
@@ -70,6 +72,12 @@ def connect(db_path: str) -> sqlite3.Connection:
     return conn
 
 
+def _connect_configured(db_path: str) -> sqlite3.Connection:
+    conn = connect(db_path)
+    _configure_connection(conn)
+    return conn
+
+
 def ensure_db(db_path: Optional[str] = None, *, log=None) -> str:
     """Ensure a usable SQLite DB exists and is migrated.
 
@@ -90,6 +98,79 @@ def ensure_db(db_path: Optional[str] = None, *, log=None) -> str:
         conn.close()
 
     return db_path
+
+
+def create_session(
+    db_path: str,
+    *,
+    profile_name: Optional[str],
+    created_at: Optional[int] = None,
+    started_at: Optional[int] = None,
+    outcome: str = "RUNNING",
+    meta: Optional[dict] = None,
+) -> str:
+    """Create a new firing session row and return its id.
+
+    This is intentionally small and server-driven (called from Oven lifecycle).
+    """
+
+    created_at = int(created_at if created_at is not None else time.time())
+    started_at = int(started_at if started_at is not None else created_at)
+    sid = str(uuid.uuid4())
+    meta_json = json.dumps(meta) if meta is not None else None
+
+    conn = _connect_configured(db_path)
+    try:
+        conn.execute("BEGIN")
+        conn.execute(
+            """
+            INSERT INTO sessions(id, created_at, started_at, ended_at, profile_name, outcome, notes, meta_json)
+            VALUES (?, ?, ?, NULL, ?, ?, NULL, ?)
+            """,
+            (sid, created_at, started_at, profile_name, outcome, meta_json),
+        )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
+
+    return sid
+
+
+def stop_session(
+    db_path: str,
+    *,
+    session_id: str,
+    ended_at: Optional[int] = None,
+    outcome: str,
+) -> bool:
+    """Mark a session ended.
+
+    Returns True if a row was updated. Idempotent for already-ended sessions.
+    """
+
+    ended_at = int(ended_at if ended_at is not None else time.time())
+
+    conn = _connect_configured(db_path)
+    try:
+        conn.execute("BEGIN")
+        cur = conn.execute(
+            """
+            UPDATE sessions
+            SET ended_at = ?, outcome = ?
+            WHERE id = ? AND ended_at IS NULL
+            """,
+            (ended_at, outcome, session_id),
+        )
+        conn.execute("COMMIT")
+        return bool(cur.rowcount)
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
 
 
 def _configure_connection(conn: sqlite3.Connection) -> None:

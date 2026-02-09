@@ -6,6 +6,7 @@ import logging
 import json
 import config
 import os
+from typing import Optional
 try:
     import tm1637
 except Exception:
@@ -14,6 +15,14 @@ except Exception:
     tm1637 = None
 
 log = logging.getLogger(__name__)
+
+
+try:
+    from kiln_db import create_session as _sqlite_create_session
+    from kiln_db import stop_session as _sqlite_stop_session
+except Exception:
+    _sqlite_create_session = None
+    _sqlite_stop_session = None
 
 
 def get_thermocouple_offset(raw_temp):
@@ -243,6 +252,8 @@ class Oven(threading.Thread):
             self.lcd2 = tm1637.TM1637(clk=config.gpio_lcd2_clk, dio=config.gpio_lcd2_dio)
             self.lcd.write([0,0,0,0])
             self.lcd2.write([0,0,0,0])
+
+        self._active_session_id: Optional[str] = None
         self.reset()
 
     def reset(self):
@@ -256,7 +267,53 @@ class Oven(threading.Thread):
         self.heat = 0
         self.pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
 
+    def _sqlite_db_path(self) -> Optional[str]:
+        return getattr(config, "sqlite_db_path", None)
+
+    def _start_session_if_possible(self) -> None:
+        if not self.profile:
+            return
+        if self._active_session_id:
+            return
+        if _sqlite_create_session is None:
+            return
+        db_path = self._sqlite_db_path()
+        if not db_path:
+            return
+
+        try:
+            self._active_session_id = _sqlite_create_session(
+                db_path,
+                profile_name=self.profile.name,
+                outcome="RUNNING",
+            )
+            log.info("SQLite session started: %s" % self._active_session_id)
+        except Exception:
+            log.exception("SQLite session start failed")
+
+    def _stop_session_if_possible(self, *, outcome: str) -> None:
+        if not self._active_session_id:
+            return
+        if _sqlite_stop_session is None:
+            self._active_session_id = None
+            return
+        db_path = self._sqlite_db_path()
+        if not db_path:
+            self._active_session_id = None
+            return
+
+        sid = self._active_session_id
+        try:
+            _sqlite_stop_session(db_path, session_id=sid, outcome=outcome)
+            log.info("SQLite session ended: %s (outcome=%s)" % (sid, outcome))
+        except Exception:
+            log.exception("SQLite session stop failed (id=%s)" % sid)
+        finally:
+            self._active_session_id = None
+
     def run_profile(self, profile, startat=0):
+        # If a new run is started while another is active, treat the prior one as aborted.
+        self._stop_session_if_possible(outcome="ABORTED")
         self.reset()
 
         if self.board.temp_sensor.noConnection:
@@ -281,7 +338,10 @@ class Oven(threading.Thread):
         log.info("Running schedule %s starting at %d minutes" % (profile.name,startat))
         log.info("Starting")
 
-    def abort_run(self):
+        self._start_session_if_possible()
+
+    def abort_run(self, *, outcome: str = "ABORTED"):
+        self._stop_session_if_possible(outcome=outcome)
         self.reset()
         self.save_automatic_restart_state()
 
@@ -333,28 +393,28 @@ class Oven(threading.Thread):
             config.emergency_shutoff_temp):
             log.info("emergency!!! temperature too high")
             if config.ignore_temp_too_high == False:
-                self.abort_run()
+                self.abort_run(outcome="ERROR")
 
         if self.board.temp_sensor.noConnection:
             log.info("emergency!!! lost connection to thermocouple")
             if config.ignore_lost_connection_tc == False:
-                self.abort_run()
+                self.abort_run(outcome="ERROR")
 
         if self.board.temp_sensor.unknownError:
             log.info("emergency!!! unknown thermocouple error")
             if config.ignore_unknown_tc_error == False:
-                self.abort_run()
+                self.abort_run(outcome="ERROR")
 
         if self.board.temp_sensor.bad_percent > 30:
             log.info("emergency!!! too many errors in a short period")
             if config.ignore_too_many_tc_errors == False:
-                self.abort_run()
+                self.abort_run(outcome="ERROR")
 
     def reset_if_schedule_ended(self):
         if self.runtime > self.totaltime:
             log.info("schedule ended, shutting down")
             log.info("total cost = %s%.2f" % (config.currency_type,self.cost))
-            self.abort_run()
+            self.abort_run(outcome="COMPLETED")
 
     def update_cost(self):
         if self.heat:
