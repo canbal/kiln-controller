@@ -41,10 +41,12 @@ Goal: run the server locally without Pi hardware.
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-local.txt
 ```
 
-If `pip install -r requirements.txt` fails on macOS (some deps are Raspberry Pi-specific, e.g. `RPi.GPIO`), use the Docker path below instead.
+If you need Pi hardware deps on an actual Raspberry Pi, use `pip install -r requirements.txt`.
+
+If local installs still fail on macOS, use the Docker path below instead.
 
 2) For local mac dev, edit `config.py` (do not commit these local tweaks):
 
