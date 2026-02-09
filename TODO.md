@@ -476,7 +476,7 @@ Rules:
   - owner: @opencode
   - deps: `T-0401`, `T-0203`
   - acceptance: chart shows tail beyond end-of-profile and indicates end marker
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/36
   - commit:
 
 ### Milestone 5: Minimal Controls in New UI (Optional)
