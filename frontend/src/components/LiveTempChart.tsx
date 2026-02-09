@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as echarts from 'echarts/core'
 import { LineChart } from 'echarts/charts'
 import {
@@ -42,12 +42,29 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<EChartsType | null>(null)
 
+  const [followLive, setFollowLive] = useState(true)
+  const followLiveRef = useRef(true)
+  const programmaticZoomRef = useRef(false)
+
   const seededRef = useRef(false)
   const lastPointAtRef = useRef<number | null>(null)
   const actualRef = useRef<Point[]>([])
   const targetRef = useRef<Point[]>([])
 
   const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
+
+  const resetToLive = () => {
+    const chart = chartRef.current
+    followLiveRef.current = true
+    setFollowLive(true)
+    if (!chart) return
+
+    programmaticZoomRef.current = true
+    chart.dispatchAction({ type: 'dataZoom', start: 80, end: 100 })
+    window.setTimeout(() => {
+      programmaticZoomRef.current = false
+    }, 0)
+  }
 
   const baseOption = useMemo(
     () => ({
@@ -128,6 +145,15 @@ export function LiveTempChart(props: LiveTempChartProps) {
     chartRef.current = chart
     chart.setOption(baseOption, { notMerge: true })
 
+    const onDataZoom = () => {
+      if (programmaticZoomRef.current) return
+      // User interacted (zoom/pan) -> stop auto-following.
+      followLiveRef.current = false
+      setFollowLive(false)
+    }
+
+    chart.on('dataZoom', onDataZoom)
+
     const ro = new ResizeObserver(() => {
       chart.resize({ animation: { duration: 0 } })
     })
@@ -135,6 +161,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     return () => {
       ro.disconnect()
+      chart.off('dataZoom', onDataZoom)
       chartRef.current = null
       chart.dispose()
     }
@@ -199,14 +226,23 @@ export function LiveTempChart(props: LiveTempChartProps) {
       { notMerge: false, lazyUpdate: true },
     )
 
-    // Keep the viewport pinned to "latest" only if already near the end.
-    const opt = chart.getOption()
-    const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as { end?: number } | undefined) : undefined
-    const end = typeof zoom0?.end === 'number' ? zoom0.end : 100
-    if (end >= 99.5) {
+    if (followLiveRef.current) {
+      programmaticZoomRef.current = true
       chart.dispatchAction({ type: 'dataZoom', start: 80, end: 100 })
+      window.setTimeout(() => {
+        programmaticZoomRef.current = false
+      }, 0)
     }
   }, [props.state, maxPoints])
 
-  return <div ref={hostRef} className="liveChart" aria-label="Live temperature chart" />
+  return (
+    <div className="liveChartWrap" aria-label="Live temperature chart">
+      {!followLive ? (
+        <button type="button" className="chartReset" onClick={resetToLive} aria-label="Reset chart to live view">
+          Reset
+        </button>
+      ) : null}
+      <div ref={hostRef} className="liveChart" />
+    </div>
+  )
 }
