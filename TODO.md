@@ -17,6 +17,8 @@ To keep work parallelizable and reviewable, follow these conventions:
 - Update `TODO.md` as part of the PR lifecycle:
   - when you open a PR for a task, mark it `IN_PROGRESS`, set `owner:`, and fill `PR:`
   - when the PR is merged, mark it `DONE` and fill `commit:` with the merge SHA
+- Handoff expectation: after completing a task (typically after the bookkeeping PR merges), include a copy/paste prompt for the next agent.
+  - The maintainer will often clear chat context and start a new session; the handoff prompt should be self-contained and point to the next Task ID(s).
 - Every PR that changes behavior should update this `TODO.md`:
   - mark the relevant Task ID(s) as DONE
   - add the merge commit SHA(s)
