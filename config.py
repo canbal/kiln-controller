@@ -148,18 +148,11 @@ pid_control_window = 5 #degrees
 # this threshold. Set to 0 to disable this feature.
 warmup_skip_threshold = 150 #degrees
 
-# (DEPRECATED) flat thermocouple offset — kept for backwards compatibility.
-# Use thermocouple_correction_table below instead.
+# thermocouple offset
+# If you put your thermocouple in ice water and it reads 36F, you can
+# set set this offset to -4 to compensate.  This probably means you have a
+# cheap thermocouple.  Invest in a better thermocouple.
 thermocouple_offset=0
-
-# Thermocouple correction table: temperature-dependent offset.
-# K-type thermocouples develop increasing negative drift at high temps
-# due to oxidation. This table defines (raw_temp, offset) pairs —
-# the offset is linearly interpolated between points and added to
-# the raw reading. Calibrate using pyrometric cone packs.
-# Example: [(70, 0), (2200, 50)] means no correction at room temp (70°F),
-# linearly increasing to +50°F correction at 2200°F.
-thermocouple_correction_table = [(70, 0), (2200, 50)]
 
 # number of samples of temperature to average.
 # If you suffer from the high temperature kiln issue and have set 

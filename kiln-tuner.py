@@ -22,7 +22,7 @@ def recordprofile(csvfile, targettemp):
     script_dir = os.path.dirname(os.path.realpath(__file__))
     sys.path.insert(0, script_dir + '/lib/')
 
-    from oven import RealOven, SimulatedOven, get_thermocouple_offset
+    from oven import RealOven, SimulatedOven
 
     # open the file to log data to
     f = open(csvfile, 'w')
@@ -50,7 +50,7 @@ def recordprofile(csvfile, targettemp):
 
         while True:
             temp = oven.board.temp_sensor.temperature + \
-                get_thermocouple_offset(oven.board.temp_sensor.temperature)
+                config.thermocouple_offset
 
             csvout.writerow([time.time(), temp])
             f.flush()
