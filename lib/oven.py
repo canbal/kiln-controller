@@ -263,6 +263,7 @@ class Oven(threading.Thread):
         self._active_session_id: Optional[str] = None
         self._cooldown_session_id: Optional[str] = None
         self._cooldown_until_ts: Optional[float] = None
+        self._cooldown_started_ts: Optional[float] = None
         self._session_lock = threading.Lock()
         self.reset()
 
@@ -325,6 +326,7 @@ class Oven(threading.Thread):
         with self._session_lock:
             self._cooldown_session_id = None
             self._cooldown_until_ts = None
+            self._cooldown_started_ts = None
 
     def stop_cooldown_capture(self, *, session_id: Optional[str] = None) -> bool:
         """Stop cooldown capture early.
@@ -340,6 +342,7 @@ class Oven(threading.Thread):
                 return False
             self._cooldown_session_id = None
             self._cooldown_until_ts = None
+            self._cooldown_started_ts = None
             return True
 
     def _persist_sample_if_possible(self, *, session_id: Optional[str] = None, state: Optional[dict] = None) -> None:
@@ -374,6 +377,7 @@ class Oven(threading.Thread):
         with self._session_lock:
             self._cooldown_session_id = session_id
             self._cooldown_until_ts = now_ts + (48 * 60 * 60)
+            self._cooldown_started_ts = now_ts
 
     def _cooldown_capture_tick(self) -> None:
         with self._session_lock:
@@ -558,6 +562,15 @@ class Oven(threading.Thread):
             temp = 0
             pass
 
+        now_ts = time.time()
+        with self._session_lock:
+            cooldown_sid = self._cooldown_session_id
+            cooldown_started_ts = self._cooldown_started_ts
+        cooldown_active = bool(cooldown_sid)
+        cooldown_elapsed = 0.0
+        if cooldown_active and cooldown_started_ts is not None:
+            cooldown_elapsed = max(0.0, now_ts - float(cooldown_started_ts))
+
         state = {
             'cost': self.cost,
             'runtime': self.runtime,
@@ -566,6 +579,10 @@ class Oven(threading.Thread):
             'state': self.state,
             'heat': self.heat,
             'totaltime': self.totaltime,
+            # Additive: natural cooldown tail capture metadata.
+            'cooldown_active': cooldown_active,
+            'cooldown_elapsed': cooldown_elapsed,
+            'cooldown_session_id': cooldown_sid,
             'kwh_rate': config.kwh_rate,
             'currency_type': config.currency_type,
             'profile': self.profile.name if self.profile else None,

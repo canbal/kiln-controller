@@ -113,6 +113,11 @@ class TestSessionLifecycle(unittest.TestCase):
         self.assertEqual(sess["outcome"], "COMPLETED")
         self.assertIsNotNone(oven._cooldown_session_id)
 
+        st0 = oven.get_state()
+        self.assertTrue(st0.get("cooldown_active"))
+        self.assertEqual(st0.get("cooldown_session_id"), sess["id"])
+        self.assertIn("cooldown_elapsed", st0)
+
         # Persist once while temp is still above the threshold (200F for temp_scale='f').
         oven._cooldown_capture_tick()
 
