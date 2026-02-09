@@ -429,11 +429,11 @@ Rules:
   - commit: 3b85d4480caef487a22c09ad3431e78b27dac706
 
 - [ ] `T-0303` Persist one sample per control loop (`sensor_time_wait`) with full `Oven.get_state()` JSON
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0302`
   - acceptance: 10-minute run produces ~600 samples
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/27
   - commit:
 
 - [ ] `T-0304` Continue recording after profile end until temp threshold/cap reached

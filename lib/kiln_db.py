@@ -173,6 +173,42 @@ def stop_session(
         conn.close()
 
 
+def add_session_sample(
+    db_path: str,
+    *,
+    session_id: str,
+    state: dict,
+    t: Optional[int] = None,
+) -> None:
+    """Persist one sample row for a session.
+
+    - `t` is stored as unix seconds (INTEGER).
+    - `state_json` stores the full `Oven.get_state()` payload.
+
+    Uses INSERT OR REPLACE so repeated writes in the same second don't fail.
+    """
+
+    sample_t = int(t if t is not None else time.time())
+    state_json = json.dumps(state, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+
+    conn = _connect_configured(db_path)
+    try:
+        conn.execute("BEGIN")
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO session_samples(session_id, t, state_json)
+            VALUES (?, ?, ?)
+            """,
+            (session_id, sample_t, state_json),
+        )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
+
+
 def _configure_connection(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
