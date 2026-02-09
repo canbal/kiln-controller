@@ -141,7 +141,7 @@
   /* Match the dark theme's "rim" idea, but place it on the bottom edge and
      make it darker (reads as a cast shadow lip on light surfaces). */
   box-shadow:
-    0 -1px 0 rgba(70, 55, 44, 0.32) inset,
+    0 -1px 0 rgba(70, 55, 44, 0.48) inset,
     0 12px 28px rgba(58, 40, 27, 0.08);
 }
 
