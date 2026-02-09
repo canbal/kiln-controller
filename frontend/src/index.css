@@ -1,12 +1,17 @@
 :root {
   /* Light theme, solid background (no textures/gradients). */
-  --bg0: #f6f7fb;
-  --bg1: #f6f7fb;
-  --card: #ffffff;
-  --text: rgba(15, 23, 42, 0.92);
-  --muted: rgba(15, 23, 42, 0.62);
-  --line: rgba(15, 23, 42, 0.14);
-  --accent: #d97706;
+  /* Warmer paper palette (kiln/clay vibe). */
+  --bg0: #fbf7f0;
+  --bg1: #fbf7f0;
+  --card: #fffdf8;
+
+  /* Ink */
+  --text: rgba(58, 40, 27, 0.92);
+  --muted: rgba(58, 40, 27, 0.62);
+
+  /* Lines and accents */
+  --line: rgba(90, 64, 44, 0.16);
+  --accent: #c56a2d;
 
   font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", Arial, sans-serif;
   line-height: 1.5;

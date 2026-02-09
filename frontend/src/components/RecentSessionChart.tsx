@@ -31,12 +31,12 @@ type RecentSessionChartProps = {
   tempScale: 'f' | 'c' | null
 }
 
-const CHART_TEXT = 'rgba(15, 23, 42, 0.74)'
-const CHART_TEXT_STRONG = 'rgba(15, 23, 42, 0.92)'
-const CHART_LINE = 'rgba(15, 23, 42, 0.22)'
-const CHART_GRID = 'rgba(15, 23, 42, 0.08)'
-const CHART_TOOLTIP_BG = 'rgba(255, 255, 255, 0.98)'
-const CHART_TOOLTIP_BORDER = 'rgba(15, 23, 42, 0.14)'
+const CHART_TEXT = 'rgba(58, 40, 27, 0.72)'
+const CHART_TEXT_STRONG = 'rgba(58, 40, 27, 0.92)'
+const CHART_LINE = 'rgba(90, 64, 44, 0.22)'
+const CHART_GRID = 'rgba(90, 64, 44, 0.08)'
+const CHART_TOOLTIP_BG = 'rgba(255, 253, 248, 0.98)'
+const CHART_TOOLTIP_BORDER = 'rgba(90, 64, 44, 0.16)'
 
 function fmtAxisTime(ms: number): string {
   const d = new Date(ms)
@@ -246,10 +246,10 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           end: 100,
           height: 18,
           bottom: 10,
-          backgroundColor: 'rgba(15, 23, 42, 0.04)',
-          borderColor: 'rgba(15, 23, 42, 0.14)',
-          fillerColor: 'rgba(180, 200, 220, 0.14)',
-          handleStyle: { color: 'rgba(180, 200, 220, 0.52)', borderColor: 'rgba(180, 200, 220, 0.28)' },
+          backgroundColor: 'rgba(90, 64, 44, 0.04)',
+          borderColor: 'rgba(90, 64, 44, 0.14)',
+          fillerColor: 'rgba(197, 106, 45, 0.10)',
+          handleStyle: { color: 'rgba(197, 106, 45, 0.40)', borderColor: 'rgba(197, 106, 45, 0.22)' },
           textStyle: { color: CHART_TEXT },
           zoomOnMouseWheel: 'ctrl',
           moveOnMouseWheel: true,
@@ -286,8 +286,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           type: 'line',
           showSymbol: false,
           data: [] as Point[],
-          itemStyle: { color: 'rgba(75, 160, 255, 0.95)' },
-          lineStyle: { width: 2, color: 'rgba(75, 160, 255, 0.95)' },
+          itemStyle: { color: 'rgba(56, 109, 140, 0.95)' },
+          lineStyle: { width: 2, color: 'rgba(56, 109, 140, 0.95)' },
           sampling: 'lttb',
         },
         {
@@ -295,8 +295,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           type: 'line',
           showSymbol: false,
           data: [] as Point[],
-          itemStyle: { color: 'rgba(184, 198, 214, 0.92)' },
-          lineStyle: { width: 2, color: 'rgba(184, 198, 214, 0.92)' },
+          itemStyle: { color: 'rgba(158, 141, 126, 0.92)' },
+          lineStyle: { width: 2, color: 'rgba(158, 141, 126, 0.92)' },
           sampling: 'lttb',
         },
         {
@@ -304,8 +304,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           type: 'line',
           showSymbol: false,
           data: [] as Point[],
-          itemStyle: { color: 'rgba(240, 176, 74, 0.95)' },
-          lineStyle: { width: 2, type: 'dashed', color: 'rgba(240, 176, 74, 0.95)' },
+          itemStyle: { color: 'rgba(197, 106, 45, 0.95)' },
+          lineStyle: { width: 2, type: 'dashed', color: 'rgba(197, 106, 45, 0.95)' },
           sampling: 'lttb',
         },
       ],
@@ -496,15 +496,15 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
                 ? {
                     silent: true,
                     symbol: ['none', 'none'],
-                    lineStyle: { color: 'rgba(240, 176, 74, 0.85)', width: 2, type: 'solid' },
+                    lineStyle: { color: 'rgba(197, 106, 45, 0.85)', width: 2, type: 'solid' },
                     label: {
                       show: true,
                       formatter: endedLabel,
-                      color: 'rgba(240, 176, 74, 0.92)',
+                      color: 'rgba(197, 106, 45, 0.92)',
                       fontWeight: 800,
                       padding: [2, 6, 2, 6],
-                      backgroundColor: 'rgba(255, 255, 255, 0.88)',
-                      borderColor: 'rgba(217, 119, 6, 0.25)',
+                      backgroundColor: 'rgba(255, 253, 248, 0.92)',
+                      borderColor: 'rgba(197, 106, 45, 0.25)',
                       borderWidth: 1,
                       borderRadius: 8,
                     },
@@ -519,10 +519,10 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
               markArea
                 ? {
                     silent: true,
-                    itemStyle: { color: 'rgba(184, 198, 214, 0.08)' },
+                    itemStyle: { color: 'rgba(158, 141, 126, 0.10)' },
                     label: {
                       show: true,
-                      color: 'rgba(184, 198, 214, 0.78)',
+                      color: 'rgba(90, 64, 44, 0.62)',
                       fontWeight: 800,
                       formatter: 'Cooldown tail',
                       position: 'insideTop',

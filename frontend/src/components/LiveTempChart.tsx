@@ -48,15 +48,15 @@ function fmtAxisTime(ms: number): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-const SERIES_ACTUAL_COLOR = 'rgba(75, 160, 255, 0.95)'
-const SERIES_TARGET_COLOR = 'rgba(240, 176, 74, 0.95)'
+const SERIES_ACTUAL_COLOR = 'rgba(56, 109, 140, 0.95)'
+const SERIES_TARGET_COLOR = 'rgba(197, 106, 45, 0.95)'
 
-const CHART_TEXT = 'rgba(15, 23, 42, 0.74)'
-const CHART_TEXT_STRONG = 'rgba(15, 23, 42, 0.92)'
-const CHART_LINE = 'rgba(15, 23, 42, 0.22)'
-const CHART_GRID = 'rgba(15, 23, 42, 0.08)'
-const CHART_TOOLTIP_BG = 'rgba(255, 255, 255, 0.98)'
-const CHART_TOOLTIP_BORDER = 'rgba(15, 23, 42, 0.14)'
+const CHART_TEXT = 'rgba(58, 40, 27, 0.72)'
+const CHART_TEXT_STRONG = 'rgba(58, 40, 27, 0.92)'
+const CHART_LINE = 'rgba(90, 64, 44, 0.22)'
+const CHART_GRID = 'rgba(90, 64, 44, 0.08)'
+const CHART_TOOLTIP_BG = 'rgba(255, 253, 248, 0.98)'
+const CHART_TOOLTIP_BORDER = 'rgba(90, 64, 44, 0.16)'
 
 export function LiveTempChart(props: LiveTempChartProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -472,10 +472,10 @@ export function LiveTempChart(props: LiveTempChartProps) {
           end: 100,
           height: 18,
           bottom: 10,
-          backgroundColor: 'rgba(15, 23, 42, 0.04)',
-          borderColor: 'rgba(15, 23, 42, 0.14)',
-          fillerColor: 'rgba(240, 176, 74, 0.20)',
-          handleStyle: { color: 'rgba(240, 176, 74, 0.65)', borderColor: 'rgba(240, 176, 74, 0.35)' },
+          backgroundColor: 'rgba(90, 64, 44, 0.04)',
+          borderColor: 'rgba(90, 64, 44, 0.14)',
+          fillerColor: 'rgba(197, 106, 45, 0.18)',
+          handleStyle: { color: 'rgba(197, 106, 45, 0.55)', borderColor: 'rgba(197, 106, 45, 0.28)' },
           textStyle: { color: CHART_TEXT },
           // Keep mousewheel pan behavior consistent with the inside zoom.
           zoomOnMouseWheel: 'ctrl',

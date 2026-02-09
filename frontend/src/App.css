@@ -73,8 +73,8 @@
 
 .pillStatus--connecting .dot,
 .pillStatus--reconnecting .dot {
-  background: rgba(240, 176, 74, 0.95);
-  box-shadow: 0 0 0 1px rgba(240, 176, 74, 0.35), 0 0 14px rgba(240, 176, 74, 0.25);
+  background: rgba(197, 106, 45, 0.95);
+  box-shadow: 0 0 0 1px rgba(197, 106, 45, 0.35), 0 0 14px rgba(197, 106, 45, 0.20);
 }
 
 .pillStatus--closed .dot,
@@ -106,7 +106,7 @@
   padding: 14px;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.80) inset,
-    0 12px 28px rgba(15, 23, 42, 0.08);
+    0 12px 28px rgba(58, 40, 27, 0.08);
 }
 
 .card h2 {
@@ -149,8 +149,6 @@
 }
 
 .btn.primary {
-  border-color: rgba(240, 176, 74, 0.45);
-  background: rgba(240, 176, 74, 0.16);
   border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
   background: color-mix(in srgb, var(--accent) 16%, var(--card));
 }
@@ -431,7 +429,7 @@
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  background: color-mix(in srgb, var(--card) 96%, rgba(15, 23, 42, 0.02));
+  background: color-mix(in srgb, var(--card) 96%, rgba(58, 40, 27, 0.02));
 }
 
 @media (min-width: 860px) {
