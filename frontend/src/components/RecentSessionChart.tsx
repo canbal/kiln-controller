@@ -222,7 +222,16 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         },
       },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none', start: 0, end: 100 },
+        {
+          type: 'inside',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          start: 0,
+          end: 100,
+          // Trackpad/two-finger scroll should pan, not zoom.
+          zoomOnMouseWheel: 'ctrl',
+          moveOnMouseWheel: true,
+        },
         {
           type: 'slider',
           xAxisIndex: 0,
@@ -235,6 +244,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           fillerColor: 'rgba(180, 200, 220, 0.14)',
           handleStyle: { color: 'rgba(180, 200, 220, 0.52)', borderColor: 'rgba(180, 200, 220, 0.28)' },
           textStyle: { color: 'rgba(255,255,255,0.70)' },
+          zoomOnMouseWheel: 'ctrl',
+          moveOnMouseWheel: true,
         },
       ],
       xAxis: {

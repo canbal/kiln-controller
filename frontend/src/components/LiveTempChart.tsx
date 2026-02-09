@@ -447,7 +447,17 @@ export function LiveTempChart(props: LiveTempChartProps) {
         },
       },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none', start: 80, end: 100 },
+        {
+          type: 'inside',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          start: 80,
+          end: 100,
+          // Trackpad/two-finger scroll should pan, not zoom.
+          // Allow zoom via pinch gesture (typically emits ctrl+wheel) or ctrl+wheel.
+          zoomOnMouseWheel: 'ctrl',
+          moveOnMouseWheel: true,
+        },
         {
           type: 'slider',
           xAxisIndex: 0,
@@ -460,6 +470,9 @@ export function LiveTempChart(props: LiveTempChartProps) {
           fillerColor: 'rgba(240, 176, 74, 0.20)',
           handleStyle: { color: 'rgba(240, 176, 74, 0.65)', borderColor: 'rgba(240, 176, 74, 0.35)' },
           textStyle: { color: 'rgba(255,255,255,0.70)' },
+          // Keep mousewheel pan behavior consistent with the inside zoom.
+          zoomOnMouseWheel: 'ctrl',
+          moveOnMouseWheel: true,
         },
       ],
       xAxis: {

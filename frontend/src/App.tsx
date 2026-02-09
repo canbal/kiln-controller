@@ -234,7 +234,7 @@ function App() {
             <div className="cardHeadMeta muted">Actual + target (when RUNNING)</div>
           </div>
           <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} />
-          <p className="muted chartHint">Pinch/scroll to zoom. Drag to pan.</p>
+          <p className="muted chartHint">Scroll/2-finger to pan. Pinch (or ctrl+scroll) to zoom. Drag to pan.</p>
         </article>
 
         <article className="card card--span2" aria-label="Recent session chart">
