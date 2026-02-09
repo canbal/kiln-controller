@@ -499,13 +499,13 @@ Rules:
 
 ### Milestone 6: Firing History + Notes
 
-- [ ] `T-0601` Add `/v1/sessions/:id` and `PATCH /v1/sessions/:id` for notes
-  - status: IN_PROGRESS
+- [x] `T-0601` Add `/v1/sessions/:id` and `PATCH /v1/sessions/:id` for notes
+  - status: DONE
   - owner: @opencode
   - deps: `T-0401`
   - acceptance: notes persist across restarts
   - PR: https://github.com/canbal/kiln-controller/pull/38
-  - commit:
+  - commit: 1e8e9ef
 
 - [ ] `T-0602` New UI: session list + detail page + notes editing
   - status: PLANNED
