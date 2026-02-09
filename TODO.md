@@ -410,13 +410,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/21
   - commit: 0ea35cd49b7299a063228a029af0944589143bc0
 
-- [ ] `T-0204` Live chart: start zoomed out until 30m, then lock window + pan
-  - status: IN_PROGRESS
+- [x] `T-0204` Live chart: start zoomed out until 30m, then lock window + pan
+  - status: DONE
   - owner: @opencode
   - deps: `T-0203`
   - acceptance: before 30 minutes, chart stays fully zoomed out; after 30 minutes, it pans a fixed 30-minute window unless the user manually zooms/pans
   - PR: https://github.com/canbal/kiln-controller/pull/28
-  - commit:
+  - commit: ae2ac95a29f440dc6e08571c20da66059e43087d
 
 ### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)
 
@@ -436,13 +436,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/25
   - commit: 3b85d4480caef487a22c09ad3431e78b27dac706
 
-- [ ] `T-0303` Persist one sample per control loop (`sensor_time_wait`) with full `Oven.get_state()` JSON
-  - status: IN_PROGRESS
+- [x] `T-0303` Persist one sample per control loop (`sensor_time_wait`) with full `Oven.get_state()` JSON
+  - status: DONE
   - owner: @opencode
   - deps: `T-0302`
   - acceptance: 10-minute run produces ~600 samples
   - PR: https://github.com/canbal/kiln-controller/pull/27
-  - commit:
+  - commit: 1cbff47b4d75628db7e19f1f53ecb16b1bcde302
 
 - [ ] `T-0304` Continue recording after profile end until temp threshold/cap reached
   - status: PLANNED
