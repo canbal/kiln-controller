@@ -4,7 +4,7 @@ import time
 import uuid
 import json
 from dataclasses import dataclass
-from typing import Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 
 @dataclass(frozen=True)
@@ -205,6 +205,125 @@ def add_session_sample(
     except Exception:
         conn.execute("ROLLBACK")
         raise
+    finally:
+        conn.close()
+
+
+def list_sessions(
+    db_path: str,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    """List sessions ordered by created_at desc.
+
+    Returned objects intentionally omit large fields like meta_json/state.
+    """
+
+    limit_i = int(limit)
+    offset_i = int(offset)
+    if limit_i <= 0:
+        limit_i = 50
+    if limit_i > 500:
+        limit_i = 500
+    if offset_i < 0:
+        offset_i = 0
+
+    conn = _connect_configured(db_path)
+    try:
+        rows = list(
+            conn.execute(
+                """
+                SELECT id, created_at, started_at, ended_at, profile_name, outcome
+                FROM sessions
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit_i, offset_i),
+            )
+        )
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_session(
+    db_path: str,
+    *,
+    session_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Fetch a single session by id, or None if not found."""
+
+    conn = _connect_configured(db_path)
+    try:
+        row = conn.execute(
+            """
+            SELECT id, created_at, started_at, ended_at, profile_name, outcome
+            FROM sessions
+            WHERE id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_session_samples(
+    db_path: str,
+    *,
+    session_id: str,
+    from_t: Optional[int] = None,
+    to_t: Optional[int] = None,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    """List samples for a session, optionally bounded by unix seconds.
+
+    - from_t/to_t are inclusive bounds on the INTEGER 't' column.
+    - Results are ordered by t asc.
+    - The returned rows include parsed 'state' JSON.
+    """
+
+    limit_i = int(limit)
+    if limit_i <= 0:
+        limit_i = 500
+    if limit_i > 5000:
+        limit_i = 5000
+
+    where = ["session_id = ?"]
+    params: List[Any] = [session_id]
+    if from_t is not None:
+        where.append("t >= ?")
+        params.append(int(from_t))
+    if to_t is not None:
+        where.append("t <= ?")
+        params.append(int(to_t))
+
+    params.append(limit_i)
+
+    conn = _connect_configured(db_path)
+    try:
+        rows = list(
+            conn.execute(
+                """
+                SELECT t, state_json
+                FROM session_samples
+                WHERE {where_sql}
+                ORDER BY t ASC
+                LIMIT ?
+                """.format(where_sql=" AND ".join(where)),
+                tuple(params),
+            )
+        )
+
+        out: List[Dict[str, Any]] = []
+        for r in rows:
+            try:
+                state = json.loads(r["state_json"])
+            except Exception:
+                state = None
+            out.append({"t": int(r["t"]), "state": state})
+        return out
     finally:
         conn.close()
 

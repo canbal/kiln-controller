@@ -200,6 +200,87 @@ def v1_stop_cooldown_capture_for_session(session_id):
         bottle.response.content_type = 'application/json'
         return json.dumps({"success": False, "error": "internal_error"})
 
+
+def _json_response(obj, *, status: int = 200):
+    bottle.response.status = status
+    bottle.response.content_type = 'application/json'
+    return json.dumps(obj, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+
+
+def _q_int(name: str, *, default=None, min_value=None, max_value=None):
+    raw = bottle.request.query.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        v = int(raw)
+    except Exception:
+        raise ValueError("invalid_int")
+    if min_value is not None and v < min_value:
+        v = min_value
+    if max_value is not None and v > max_value:
+        v = max_value
+    return v
+
+
+def _configured_sqlite_db_path():
+    return getattr(config, "sqlite_db_path", os.path.join(script_dir, "storage", "kiln.sqlite3"))
+
+
+@app.get('/v1/sessions')
+def v1_list_sessions():
+    """List firing sessions (new additive REST API)."""
+
+    try:
+        limit = _q_int("limit", default=50, min_value=1, max_value=500)
+        offset = _q_int("offset", default=0, min_value=0, max_value=1000000)
+    except ValueError:
+        return _json_response({"success": False, "error": "bad_request"}, status=400)
+
+    try:
+        from kiln_db import list_sessions
+
+        sessions = list_sessions(_configured_sqlite_db_path(), limit=limit, offset=offset)
+        return _json_response({"success": True, "sessions": sessions, "count": len(sessions)})
+    except Exception:
+        log.exception("/v1/sessions failed")
+        return _json_response({"success": False, "error": "db_unavailable"}, status=503)
+
+
+@app.get('/v1/sessions/<session_id>/samples')
+def v1_list_session_samples(session_id):
+    """Fetch a time-bounded sample window for a session."""
+
+    try:
+        from_t = _q_int("from", default=None, min_value=0, max_value=2**31 - 1)
+        to_t = _q_int("to", default=None, min_value=0, max_value=2**31 - 1)
+        limit = _q_int("limit", default=500, min_value=1, max_value=5000)
+    except ValueError:
+        return _json_response({"success": False, "error": "bad_request"}, status=400)
+
+    try:
+        from kiln_db import get_session, list_session_samples
+
+        db_path = _configured_sqlite_db_path()
+        sess = get_session(db_path, session_id=session_id)
+        if not sess:
+            return _json_response({"success": False, "error": "not_found"}, status=404)
+
+        samples = list_session_samples(db_path, session_id=session_id, from_t=from_t, to_t=to_t, limit=limit)
+        return _json_response(
+            {
+                "success": True,
+                "session": sess,
+                "session_id": session_id,
+                "from": from_t,
+                "to": to_t,
+                "samples": samples,
+                "count": len(samples),
+            }
+        )
+    except Exception:
+        log.exception("/v1/sessions/%s/samples failed" % session_id)
+        return _json_response({"success": False, "error": "db_unavailable"}, status=503)
+
 def find_profile(wanted):
     '''
     given a wanted profile name, find it and return the parsed
