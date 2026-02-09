@@ -103,6 +103,10 @@ After you've installed dependencies on the Pi (see **Raspberry PI deployment** a
 
 Then open:
 
+    http://<pi-ip>:<listening_port>/
+
+This redirects to the legacy UI at:
+
     http://<pi-ip>:<listening_port>/picoreflow/index.html
 
 ## Development Only (macOS/Linux)
@@ -131,7 +135,8 @@ If you're on a Raspberry Pi and want real hardware support, use `requirements.tx
 
 4) Open in a browser:
 
-- Legacy UI: http://localhost:8080/picoreflow/index.html
+- Legacy UI (redirect): http://localhost:8080/
+- Legacy UI (direct): http://localhost:8080/picoreflow/index.html
 - New UI placeholder: http://localhost:8080/app
 
 Notes:

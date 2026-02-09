@@ -60,7 +60,8 @@ source kilnenv/bin/activate && DEVELOPMENT=1 ./kiln-controller.py
 
 4) Open:
 
-- `http://localhost:8080/picoreflow/index.html`
+- `http://localhost:8080/` (redirects to legacy UI)
+- `http://localhost:8080/picoreflow/index.html` (legacy UI direct)
 - `http://localhost:8080/app`
 
 Notes:
