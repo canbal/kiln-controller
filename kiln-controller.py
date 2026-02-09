@@ -70,6 +70,17 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
 profile_path = config.kiln_profiles_directory
 
+# Additive: initialize SQLite session DB for the modern UI workstream.
+# Failure should not prevent the kiln controller from running (legacy UI/paths remain the fallback).
+try:
+    from kiln_db import ensure_db as ensure_sqlite_db
+
+    sqlite_db_path = getattr(config, "sqlite_db_path", os.path.join(script_dir, "storage", "kiln.sqlite3"))
+    ensure_sqlite_db(sqlite_db_path, log=log)
+    log.info("SQLite DB ready: %s" % sqlite_db_path)
+except Exception:
+    log.exception("SQLite DB init failed; continuing without DB")
+
 from oven import SimulatedOven, RealOven, Profile
 from ovenWatcher import OvenWatcher
 
