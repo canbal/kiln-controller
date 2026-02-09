@@ -31,6 +31,13 @@ type RecentSessionChartProps = {
   tempScale: 'f' | 'c' | null
 }
 
+const CHART_TEXT = 'rgba(15, 23, 42, 0.74)'
+const CHART_TEXT_STRONG = 'rgba(15, 23, 42, 0.92)'
+const CHART_LINE = 'rgba(15, 23, 42, 0.22)'
+const CHART_GRID = 'rgba(15, 23, 42, 0.08)'
+const CHART_TOOLTIP_BG = 'rgba(255, 255, 255, 0.98)'
+const CHART_TOOLTIP_BORDER = 'rgba(15, 23, 42, 0.14)'
+
 function fmtAxisTime(ms: number): string {
   const d = new Date(ms)
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -208,14 +215,14 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         left: 0,
         itemWidth: 10,
         itemHeight: 10,
-        textStyle: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
+        textStyle: { color: CHART_TEXT, fontSize: 12 },
       },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
-        backgroundColor: 'rgba(12, 18, 28, 0.92)',
-        borderColor: 'rgba(255,255,255,0.14)',
-        textStyle: { color: 'rgba(255,255,255,0.92)' },
+        backgroundColor: CHART_TOOLTIP_BG,
+        borderColor: CHART_TOOLTIP_BORDER,
+        textStyle: { color: CHART_TEXT_STRONG },
         valueFormatter: (v: unknown) => {
           const u = unitRef.current
           return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
@@ -239,11 +246,11 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           end: 100,
           height: 18,
           bottom: 10,
-          backgroundColor: 'rgba(255,255,255,0.06)',
-          borderColor: 'rgba(255,255,255,0.14)',
+          backgroundColor: 'rgba(15, 23, 42, 0.04)',
+          borderColor: 'rgba(15, 23, 42, 0.14)',
           fillerColor: 'rgba(180, 200, 220, 0.14)',
           handleStyle: { color: 'rgba(180, 200, 220, 0.52)', borderColor: 'rgba(180, 200, 220, 0.28)' },
-          textStyle: { color: 'rgba(255,255,255,0.70)' },
+          textStyle: { color: CHART_TEXT },
           zoomOnMouseWheel: 'ctrl',
           moveOnMouseWheel: true,
         },
@@ -252,26 +259,26 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         type: 'time',
         minInterval: 60_000,
         axisLabel: {
-          color: 'rgba(255,255,255,0.70)',
+          color: CHART_TEXT,
           formatter: (v: number) => fmtAxisTime(v),
           hideOverlap: true,
         },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLine: { lineStyle: { color: CHART_LINE } },
+        splitLine: { lineStyle: { color: CHART_GRID } },
       },
       yAxis: {
         type: 'value',
         boundaryGap: ['10%', '10%'],
         minInterval: 0.5,
         axisLabel: {
-          color: 'rgba(255,255,255,0.70)',
+          color: CHART_TEXT,
           formatter: (v: number) => {
             const u = unitRef.current
             return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
           },
         },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLine: { lineStyle: { color: CHART_LINE } },
+        splitLine: { lineStyle: { color: CHART_GRID } },
       },
       series: [
         {
@@ -496,8 +503,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
                       color: 'rgba(240, 176, 74, 0.92)',
                       fontWeight: 800,
                       padding: [2, 6, 2, 6],
-                      backgroundColor: 'rgba(12, 18, 28, 0.65)',
-                      borderColor: 'rgba(240, 176, 74, 0.25)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.88)',
+                      borderColor: 'rgba(217, 119, 6, 0.25)',
                       borderWidth: 1,
                       borderRadius: 8,
                     },

@@ -105,8 +105,8 @@
   background: var(--card);
   padding: 14px;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.03) inset,
-    0 12px 28px rgba(0, 0, 0, 0.18);
+    0 1px 0 rgba(255, 255, 255, 0.80) inset,
+    0 12px 28px rgba(15, 23, 42, 0.08);
 }
 
 .card h2 {
@@ -261,7 +261,7 @@
 .badge--running {
   border-color: rgba(86, 196, 110, 0.35);
   background: rgba(86, 196, 110, 0.16);
-  color: rgba(200, 255, 214, 0.92);
+  color: rgba(20, 83, 45, 0.92);
 }
 
 .badge--idle {
@@ -389,7 +389,7 @@
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  background: rgba(10, 14, 22, 0.72);
+  background: rgba(255, 255, 255, 0.85);
   color: color-mix(in srgb, var(--text) 92%, transparent);
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -415,7 +415,7 @@
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  background: rgba(10, 14, 22, 0.72);
+  background: rgba(255, 255, 255, 0.85);
   color: color-mix(in srgb, var(--text) 92%, transparent);
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -431,7 +431,7 @@
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  background: color-mix(in srgb, var(--card) 70%, rgba(0, 0, 0, 0.18));
+  background: color-mix(in srgb, var(--card) 96%, rgba(15, 23, 42, 0.02));
 }
 
 @media (min-width: 860px) {

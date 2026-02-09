@@ -51,6 +51,13 @@ function fmtAxisTime(ms: number): string {
 const SERIES_ACTUAL_COLOR = 'rgba(75, 160, 255, 0.95)'
 const SERIES_TARGET_COLOR = 'rgba(240, 176, 74, 0.95)'
 
+const CHART_TEXT = 'rgba(15, 23, 42, 0.74)'
+const CHART_TEXT_STRONG = 'rgba(15, 23, 42, 0.92)'
+const CHART_LINE = 'rgba(15, 23, 42, 0.22)'
+const CHART_GRID = 'rgba(15, 23, 42, 0.08)'
+const CHART_TOOLTIP_BG = 'rgba(255, 255, 255, 0.98)'
+const CHART_TOOLTIP_BORDER = 'rgba(15, 23, 42, 0.14)'
+
 export function LiveTempChart(props: LiveTempChartProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<EChartsType | null>(null)
@@ -433,14 +440,14 @@ export function LiveTempChart(props: LiveTempChartProps) {
         left: 0,
         itemWidth: 10,
         itemHeight: 10,
-        textStyle: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
+        textStyle: { color: CHART_TEXT, fontSize: 12 },
       },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
-        backgroundColor: 'rgba(12, 18, 28, 0.92)',
-        borderColor: 'rgba(255,255,255,0.14)',
-        textStyle: { color: 'rgba(255,255,255,0.92)' },
+        backgroundColor: CHART_TOOLTIP_BG,
+        borderColor: CHART_TOOLTIP_BORDER,
+        textStyle: { color: CHART_TEXT_STRONG },
         valueFormatter: (v: unknown) => {
           const u = unitRef.current
           return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
@@ -465,11 +472,11 @@ export function LiveTempChart(props: LiveTempChartProps) {
           end: 100,
           height: 18,
           bottom: 10,
-          backgroundColor: 'rgba(255,255,255,0.06)',
-          borderColor: 'rgba(255,255,255,0.14)',
+          backgroundColor: 'rgba(15, 23, 42, 0.04)',
+          borderColor: 'rgba(15, 23, 42, 0.14)',
           fillerColor: 'rgba(240, 176, 74, 0.20)',
           handleStyle: { color: 'rgba(240, 176, 74, 0.65)', borderColor: 'rgba(240, 176, 74, 0.35)' },
-          textStyle: { color: 'rgba(255,255,255,0.70)' },
+          textStyle: { color: CHART_TEXT },
           // Keep mousewheel pan behavior consistent with the inside zoom.
           zoomOnMouseWheel: 'ctrl',
           moveOnMouseWheel: true,
@@ -480,12 +487,12 @@ export function LiveTempChart(props: LiveTempChartProps) {
         // Prevent duplicate labels like 06:51 06:51 06:51 when the axis ticks are < 1 minute.
         minInterval: 60_000,
         axisLabel: {
-          color: 'rgba(255,255,255,0.70)',
+          color: CHART_TEXT,
           formatter: (v: number) => fmtAxisTime(v),
           hideOverlap: true,
         },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLine: { lineStyle: { color: CHART_LINE } },
+        splitLine: { lineStyle: { color: CHART_GRID } },
       },
       yAxis: {
         type: 'value',
@@ -494,14 +501,14 @@ export function LiveTempChart(props: LiveTempChartProps) {
         // using the same minimum keeps the axis legible in both scales).
         minInterval: 0.5,
         axisLabel: {
-          color: 'rgba(255,255,255,0.70)',
+          color: CHART_TEXT,
           formatter: (v: number) => {
             const u = unitRef.current
             return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
           },
         },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLine: { lineStyle: { color: CHART_LINE } },
+        splitLine: { lineStyle: { color: CHART_GRID } },
       },
       series: [
         {

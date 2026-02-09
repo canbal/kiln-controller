@@ -1,11 +1,12 @@
 :root {
-  --bg0: #0b0f17;
-  --bg1: #0d1624;
-  --card: rgba(255, 255, 255, 0.06);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.70);
-  --line: rgba(255, 255, 255, 0.12);
-  --accent: #f0b04a;
+  /* Light theme, solid background (no textures/gradients). */
+  --bg0: #f6f7fb;
+  --bg1: #f6f7fb;
+  --card: #ffffff;
+  --text: rgba(15, 23, 42, 0.92);
+  --muted: rgba(15, 23, 42, 0.62);
+  --line: rgba(15, 23, 42, 0.14);
+  --accent: #d97706;
 
   font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", Arial, sans-serif;
   line-height: 1.5;
@@ -29,17 +30,7 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--text);
-  background:
-    radial-gradient(900px 700px at 20% 12%, rgba(240, 176, 74, 0.16), transparent 55%),
-    radial-gradient(800px 620px at 80% 26%, rgba(75, 160, 255, 0.12), transparent 60%),
-    repeating-linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.03),
-      rgba(255, 255, 255, 0.03) 2px,
-      transparent 2px,
-      transparent 10px
-    ),
-    linear-gradient(180deg, var(--bg0), var(--bg1));
+  background: var(--bg0);
 }
 
 code {
@@ -49,11 +40,9 @@ code {
 }
 
 a {
-  color: #ffd08a;
-  color: color-mix(in srgb, var(--accent) 92%, white);
+  color: color-mix(in srgb, var(--accent) 82%, black);
 }
 
 a:hover {
-  color: #ffbe66;
-  color: color-mix(in srgb, var(--accent) 70%, white);
+  color: color-mix(in srgb, var(--accent) 92%, black);
 }
