@@ -32,6 +32,89 @@ To keep work parallelizable and reviewable, follow these conventions:
 - Prefer parallel work by splitting across Workstreams (frontend shell, backend sessions, docs, etc.).
 - Avoid breaking changes and avoid touching `/picoreflow` during migration.
 
+### Local Development (macOS)
+
+Goal: run the server locally without Pi hardware.
+
+1) Create and activate a virtualenv, install deps:
+
+```bash
+python3 -m venv kilnenv
+source kilnenv/bin/activate
+pip install -r requirements-local.txt
+```
+
+If you need Pi hardware deps on an actual Raspberry Pi, use `pip install -r requirements.txt`.
+
+If local installs still fail on macOS, use the Docker path below instead.
+
+2) For local mac dev, do not edit `config.py`. Use env vars:
+
+- `DEVELOPMENT=1` forces `simulate=True`
+- `PORT=8080` avoids needing sudo for port 80
+
+3) Run the server:
+
+```bash
+source kilnenv/bin/activate && PORT=8080 DEVELOPMENT=1 ./kiln-controller.py
+```
+
+4) Open:
+
+- `http://localhost:8080/` (redirects to legacy UI)
+- `http://localhost:8080/picoreflow/index.html` (legacy UI direct)
+- `http://localhost:8080/app`
+
+Notes:
+
+- If you keep `listening_port = 80`, you will likely need `sudo` on macOS.
+- Before deploying to the kiln, ensure `config.py` is set back to your Pi settings.
+
+#### macOS + Docker (More Reliable)
+
+This runs the server in a Linux container, which tends to avoid macOS build issues.
+
+```bash
+docker run --rm -it \
+  -p 8080:8080 \
+  -v "$PWD":/work \
+  -w /work \
+  python:3.11-slim bash
+```
+
+Inside the container:
+
+```bash
+python -m venv kilnenv
+source kilnenv/bin/activate
+pip install -r requirements.txt
+```
+
+Then do the same `config.py` local tweaks (`simulate = True`, `listening_port = 8080`) and run:
+
+```bash
+./kiln-controller.py
+```
+
+### Visual Validation Checklist (Human-Reviewed PRs)
+
+Some PRs (especially UI) require a human to visually validate behavior.
+
+Rules:
+
+- Every PR that changes UI or routing must include a PR description checklist using GitHub task list items.
+- The maintainer should check these boxes before merging.
+- Agents should run automated/non-visual validations when possible (lint, unit tests, curl smoke checks), but still ask the maintainer to re-validate visuals.
+
+Suggested PR checklist template:
+
+```md
+## Visual Validation (maintainer)
+- [ ] `/picoreflow/index.html` loads and is functional
+- [ ] `/app` loads on a phone-sized viewport (or device)
+- [ ] No unexpected console errors / server tracebacks
+```
+
 ### Status Legend
 
 - PLANNED: not started
@@ -262,11 +345,11 @@ Rules:
 ### Milestone 1: New UI Shell (Complementary, Read-Only)
 
 - [ ] `T-0101` Add `/app` route that serves new static UI without touching `/picoreflow`
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0001`
   - acceptance: `/picoreflow/index.html` still loads; `/app` loads on phone
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/10
   - commit:
 
 - [ ] `T-0102` Create `frontend/` React+TS+Vite skeleton and produce committed build output in `public/app/`

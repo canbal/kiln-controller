@@ -65,8 +65,8 @@ Download [Raspberry PI OS](https://www.raspberrypi.org/software/). Use Rasberry 
     $ sudo apt-get install python3-dev python3-virtualenv libevent-dev virtualenv
     $ git clone https://github.com/jbruce12000/kiln-controller
     $ cd kiln-controller
-    $ virtualenv -p python3 venv
-    $ source venv/bin/activate
+    $ virtualenv -p python3 kilnenv
+    $ source kilnenv/bin/activate
     $ export CFLAGS=-fcommon
     $ pip3 install --upgrade setuptools
     $ pip3 install greenlet bottle gevent gevent-websocket
@@ -78,8 +78,8 @@ Download [Raspberry PI OS](https://www.raspberrypi.org/software/). Use Rasberry 
 If you're done playing around with simulations and want to deploy the code on a Raspberry PI to control a kiln, you'll need to do this in addition to the stuff listed above:
 
     $ cd kiln-controller
-    $ virtualenv -p python3 venv
-    $ source venv/bin/activate
+    $ virtualenv -p python3 kilnenv
+    $ source kilnenv/bin/activate
     $ export CFLAGS=-fcommon
     $ pip3 install -r requirements.txt
 
@@ -95,7 +95,50 @@ You may want to change the configuration parameter **sensor_time_wait**. It's th
 
 ### Server Startup
 
-    $ source venv/bin/activate; ./kiln-controller.py
+This project is primarily intended to run on a Raspberry Pi connected to a kiln.
+
+After you've installed dependencies on the Pi (see **Raspberry PI deployment** above), start the server:
+
+    $ source kilnenv/bin/activate; ./kiln-controller.py
+
+Then open:
+
+    http://<pi-ip>:<listening_port>/
+
+This redirects to the legacy UI at:
+
+    http://<pi-ip>:<listening_port>/picoreflow/index.html
+
+## Development Only (macOS/Linux)
+
+### Local Development (simulate mode)
+
+If you want to visually test the web UI locally (macOS/Linux) without Raspberry Pi hardware, run in simulation mode.
+
+This is for visual testing and development on non-Raspberry Pi machines without hardware.
+
+1) Create a virtualenv and install local-only deps:
+
+    $ python3 -m venv kilnenv
+    $ source kilnenv/bin/activate
+    $ pip install -r requirements-local.txt
+
+If you're on a Raspberry Pi and want real hardware support, use `requirements.txt` instead.
+
+2) Start the server (no need to edit `config.py`):
+
+    $ source kilnenv/bin/activate; PORT=8080 DEVELOPMENT=1 ./kiln-controller.py
+
+4) Open in a browser:
+
+- Legacy UI (redirect): http://localhost:8080/
+- Legacy UI (direct): http://localhost:8080/picoreflow/index.html
+- New UI placeholder: http://localhost:8080/app
+
+Notes:
+
+- Port `80` requires elevated privileges on most machines; use `8080` locally.
+- Do not commit local-only `config.py` tweaks.
 
 ### Autostart Server onBoot
 If you want the server to autostart on boot, run the following command:
@@ -104,8 +147,10 @@ If you want the server to autostart on boot, run the following command:
 
 ### Client Access
 
-Click http://127.0.0.1:8081 for local development or the IP
-of your PI and the port defined in config.py (default 8081).
+Open the server at the IP/port configured by `listening_port` in `config.py`.
+For example, if you set `listening_port = 8080` for local dev, use:
+
+    http://127.0.0.1:8080/picoreflow/index.html
 
 ### Simulation
 

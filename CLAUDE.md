@@ -10,14 +10,14 @@ This is a Raspberry Pi-based kiln controller for ceramic kilns. It provides web-
 
 ### Running the Server
 ```bash
-source venv/bin/activate && ./kiln-controller.py
+source kilnenv/bin/activate && ./kiln-controller.py
 ```
 Web interface available at `http://<pi-ip>:80` (port configured in `config.py`).
 
 ### Installation (Raspberry Pi)
 ```bash
-virtualenv -p python3 venv
-source venv/bin/activate
+virtualenv -p python3 kilnenv
+source kilnenv/bin/activate
 export CFLAGS=-fcommon
 pip3 install -r requirements.txt
 ```
