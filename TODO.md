@@ -412,13 +412,13 @@ Rules:
 
 ### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)
 
-- [ ] `T-0301` Add SQLite DB file, schema versioning, and minimal migrations
-  - status: IN_PROGRESS
+- [x] `T-0301` Add SQLite DB file, schema versioning, and minimal migrations
+  - status: DONE
   - owner: @opencode
   - deps:
   - acceptance: fresh boot creates DB; version table exists
   - PR: https://github.com/canbal/kiln-controller/pull/23
-  - commit:
+  - commit: 3055636d96cc641ce14de0bd9a9098f4b4cf379f
 
 - [ ] `T-0302` Create/stop sessions automatically on run start/stop (server-driven)
   - status: PLANNED
