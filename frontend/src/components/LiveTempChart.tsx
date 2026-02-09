@@ -38,6 +38,9 @@ function fmtAxisTime(ms: number): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+const SERIES_ACTUAL_COLOR = 'rgba(75, 160, 255, 0.95)'
+const SERIES_TARGET_COLOR = 'rgba(240, 176, 74, 0.95)'
+
 export function LiveTempChart(props: LiveTempChartProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<EChartsType | null>(null)
@@ -120,7 +123,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
           name: 'Actual',
           type: 'line',
           showSymbol: false,
-          lineStyle: { width: 2, color: 'rgba(86, 196, 110, 0.95)' },
+          itemStyle: { color: SERIES_ACTUAL_COLOR },
+          lineStyle: { width: 2, color: SERIES_ACTUAL_COLOR },
           emphasis: { focus: 'series' },
           data: [] as Point[],
           sampling: 'lttb',
@@ -129,7 +133,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
           name: 'Target',
           type: 'line',
           showSymbol: false,
-          lineStyle: { width: 2, type: 'dashed', color: 'rgba(240, 176, 74, 0.95)' },
+          itemStyle: { color: SERIES_TARGET_COLOR },
+          lineStyle: { width: 2, type: 'dashed', color: SERIES_TARGET_COLOR },
           emphasis: { focus: 'series' },
           data: [] as Point[],
           sampling: 'lttb',
