@@ -444,3 +444,26 @@
   margin: 10px 0 0;
   font-size: 12px;
 }
+
+.recentSessionMeta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (min-width: 540px) {
+  .recentSessionMeta {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sessionChart {
+  height: 240px;
+}
+
+@media (min-width: 860px) {
+  .sessionChart {
+    height: 300px;
+  }
+}
