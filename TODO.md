@@ -403,11 +403,11 @@ Rules:
   - commit: e010fc5347b76b4d10afe5106371e74251118bd8
 
 - [ ] `T-0203` Add ECharts live plot (actual temp + target when available)
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0201`
   - acceptance: chart renders and updates without noticeable lag
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/21
   - commit:
 
 ### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)

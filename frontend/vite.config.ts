@@ -7,6 +7,19 @@ export default defineConfig({
   // The Bottle server serves this UI under /app.
   base: '/app/',
   plugins: [react()],
+  server: {
+    // HMR dev server. Use proxy so the browser can still connect to legacy WS/HTTP endpoints
+    // (our WS client uses window.location.host).
+    open: '/app/',
+    proxy: {
+      '/status': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
+      '/control': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
+      '/storage': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
+      '/config': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
+      '/api': { target: 'http://localhost:8080', changeOrigin: true },
+      '/picoreflow': { target: 'http://localhost:8080', changeOrigin: true },
+    },
+  },
   build: {
     outDir: '../public/app',
     emptyOutDir: true,
