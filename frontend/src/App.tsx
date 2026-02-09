@@ -1,5 +1,6 @@
 import './App.css'
 import { useStatusWs } from './ws/status'
+import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
 
 function formatTime(d: Date | null): string {
@@ -72,8 +73,10 @@ function stateLabel(s: string | null | undefined): string {
 
 function App() {
   const status = useStatusWs()
+  const cfg = useConfigWs()
   const oven = status.state
   const running = oven?.state === 'RUNNING'
+  const unit = cfg.tempScale === 'c' ? 'C' : cfg.tempScale === 'f' ? 'F' : ''
 
   return (
     <main className="app">
@@ -96,7 +99,7 @@ function App() {
             <div className="metricsTemp" aria-label="Current temperature">
               <div className="tempValue">
                 {formatTemp(oven?.temperature)}
-                <span className="tempUnit">&deg;</span>
+                <span className="tempUnit">&deg;{unit}</span>
               </div>
               <div className="tempMeta">
                 {status.connection === 'open' ? (
@@ -120,7 +123,7 @@ function App() {
               <div className="tileLabel">Target</div>
               <div className="tileValue">
                 {formatTemp(oven?.target)}
-                <span className="tileUnit">&deg;</span>
+                <span className="tileUnit">&deg;{unit}</span>
               </div>
             </div>
 
@@ -158,7 +161,7 @@ function App() {
             <h2>Live Temperature</h2>
             <div className="cardHeadMeta muted">Actual + target (when RUNNING)</div>
           </div>
-          <LiveTempChart state={status.state} backlog={status.backlog} />
+          <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} />
           <p className="muted chartHint">Pinch/scroll to zoom. Drag to pan.</p>
         </article>
 

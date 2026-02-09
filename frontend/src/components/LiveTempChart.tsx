@@ -19,6 +19,7 @@ type Point = [number, number | null]
 type LiveTempChartProps = {
   state: OvenState | null
   backlog: StatusBacklogEnvelope | null
+  tempScale: 'f' | 'c' | null
 }
 
 function clampHistory(points: Point[], maxPoints: number): void {
@@ -57,6 +58,13 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const targetRef = useRef<Point[]>([])
 
   const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
+
+  const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
+  const unitRef = useRef(unit)
+
+  useEffect(() => {
+    unitRef.current = unit
+  }, [unit])
 
   const timeExtent = () => {
     const pts = actualRef.current
@@ -124,7 +132,10 @@ export function LiveTempChart(props: LiveTempChartProps) {
         backgroundColor: 'rgba(12, 18, 28, 0.92)',
         borderColor: 'rgba(255,255,255,0.14)',
         textStyle: { color: 'rgba(255,255,255,0.92)' },
-        valueFormatter: (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v)}°` : '--'),
+        valueFormatter: (v: unknown) => {
+          const u = unitRef.current
+          return typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v)}°${u}` : '--'
+        },
       },
       dataZoom: [
         { type: 'inside', xAxisIndex: 0, filterMode: 'none', start: 80, end: 100 },
@@ -150,7 +161,13 @@ export function LiveTempChart(props: LiveTempChartProps) {
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: 'rgba(255,255,255,0.70)' },
+        axisLabel: {
+          color: 'rgba(255,255,255,0.70)',
+          formatter: (v: number) => {
+            const u = unitRef.current
+            return Number.isFinite(v) ? `${Math.round(v)}°${u}` : '--'
+          },
+        },
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
         splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
       },
