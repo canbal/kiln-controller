@@ -18,6 +18,7 @@ To keep work parallelizable and reviewable, follow these conventions:
 - Every PR must be reviewed by the human maintainer before it is merged.
   - Agents must not merge PRs on their own.
   - Wait for an explicit maintainer message containing the word "merge" for that PR before merging.
+  - Exception: bookkeeping-only PRs that *only* update `TODO.md` task status/checkboxes/PR links/merge SHAs may be merged without human review.
 - Update `TODO.md` as part of the PR lifecycle:
   - when you open a PR for a task, mark it `IN_PROGRESS`, set `owner:`, and fill `PR:`
   - when the PR is merged, mark it `DONE` and fill `commit:` with the merge SHA
