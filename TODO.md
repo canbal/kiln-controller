@@ -246,12 +246,12 @@ Rules:
   - commit: b4996e65319d81436cbfcd5f7d5ebc967b918d01
 
 - [ ] `T-0003` Add fixture JSON for `/api/stats` payload
-  - status: IN_PROGRESS
+  - status: DONE
   - owner: @opencode
   - deps: `T-0001`
   - acceptance: fixture exists and matches current server output shape
   - PR: https://github.com/canbal/kiln-controller/pull/7
-  - commit:
+  - commit: 86664e71c7cf3680592880fa24fe190d3f8b9f6f
 
 ### Milestone 1: New UI Shell (Complementary, Read-Only)
 
