@@ -332,6 +332,7 @@ def v1_patch_session(session_id):
         log.exception("/v1/sessions/%s patch failed" % session_id)
         return _json_response({"success": False, "error": "db_unavailable"}, status=503)
 
+
 def find_profile(wanted):
     '''
     given a wanted profile name, find it and return the parsed

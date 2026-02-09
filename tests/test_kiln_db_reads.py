@@ -82,6 +82,5 @@ class TestKilnDbReads(unittest.TestCase):
             self.assertIsNotNone(sess2)
             self.assertIsNone(sess2.get("notes"))
 
-
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,7 @@ type LiveTempChartProps = {
   state: OvenState | null
   backlog: StatusBacklogEnvelope | null
   tempScale: 'f' | 'c' | null
+  theme?: 'stoneware' | 'dark'
 }
 
 function fmtTemp(v: number): string {
@@ -48,10 +49,62 @@ function fmtAxisTime(ms: number): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-const SERIES_ACTUAL_COLOR = 'rgba(75, 160, 255, 0.95)'
-const SERIES_TARGET_COLOR = 'rgba(240, 176, 74, 0.95)'
+type ChartScheme = {
+  seriesActual: string
+  seriesTarget: string
+  text: string
+  textStrong: string
+  line: string
+  grid: string
+  tooltipBg: string
+  tooltipBorder: string
+  zoomBg: string
+  zoomBorder: string
+  zoomFill: string
+  zoomHandle: string
+  zoomHandleBorder: string
+}
+
+function schemeForTheme(theme: 'stoneware' | 'dark'): ChartScheme {
+  if (theme === 'stoneware') {
+    return {
+      seriesActual: 'rgba(56, 109, 140, 0.95)',
+      seriesTarget: 'rgba(138, 90, 68, 0.95)',
+      text: 'rgba(45, 35, 28, 0.72)',
+      textStrong: 'rgba(45, 35, 28, 0.92)',
+      line: 'rgba(70, 55, 44, 0.22)',
+      grid: 'rgba(70, 55, 44, 0.08)',
+      tooltipBg: 'rgba(251, 248, 242, 0.98)',
+      tooltipBorder: 'rgba(70, 55, 44, 0.16)',
+      zoomBg: 'rgba(70, 55, 44, 0.04)',
+      zoomBorder: 'rgba(70, 55, 44, 0.14)',
+      zoomFill: 'rgba(138, 90, 68, 0.16)',
+      zoomHandle: 'rgba(138, 90, 68, 0.45)',
+      zoomHandleBorder: 'rgba(138, 90, 68, 0.22)',
+    }
+  }
+
+  // dark
+  return {
+    seriesActual: 'rgba(75, 160, 255, 0.95)',
+    seriesTarget: 'rgba(240, 176, 74, 0.95)',
+    text: 'rgba(255, 255, 255, 0.78)',
+    textStrong: 'rgba(255, 255, 255, 0.92)',
+    line: 'rgba(255, 255, 255, 0.16)',
+    grid: 'rgba(255, 255, 255, 0.08)',
+    tooltipBg: 'rgba(12, 18, 28, 0.92)',
+    tooltipBorder: 'rgba(255, 255, 255, 0.14)',
+    zoomBg: 'rgba(255, 255, 255, 0.06)',
+    zoomBorder: 'rgba(255, 255, 255, 0.14)',
+    zoomFill: 'rgba(240, 176, 74, 0.20)',
+    zoomHandle: 'rgba(240, 176, 74, 0.65)',
+    zoomHandleBorder: 'rgba(240, 176, 74, 0.35)',
+  }
+}
 
 export function LiveTempChart(props: LiveTempChartProps) {
+  const theme = props.theme ?? 'stoneware'
+  const scheme = useMemo(() => schemeForTheme(theme), [theme])
   const hostRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<EChartsType | null>(null)
 
@@ -433,14 +486,14 @@ export function LiveTempChart(props: LiveTempChartProps) {
         left: 0,
         itemWidth: 10,
         itemHeight: 10,
-        textStyle: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
+        textStyle: { color: scheme.text, fontSize: 12 },
       },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
-        backgroundColor: 'rgba(12, 18, 28, 0.92)',
-        borderColor: 'rgba(255,255,255,0.14)',
-        textStyle: { color: 'rgba(255,255,255,0.92)' },
+        backgroundColor: scheme.tooltipBg,
+        borderColor: scheme.tooltipBorder,
+        textStyle: { color: scheme.textStrong },
         valueFormatter: (v: unknown) => {
           const u = unitRef.current
           return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
@@ -465,11 +518,11 @@ export function LiveTempChart(props: LiveTempChartProps) {
           end: 100,
           height: 18,
           bottom: 10,
-          backgroundColor: 'rgba(255,255,255,0.06)',
-          borderColor: 'rgba(255,255,255,0.14)',
-          fillerColor: 'rgba(240, 176, 74, 0.20)',
-          handleStyle: { color: 'rgba(240, 176, 74, 0.65)', borderColor: 'rgba(240, 176, 74, 0.35)' },
-          textStyle: { color: 'rgba(255,255,255,0.70)' },
+          backgroundColor: scheme.zoomBg,
+          borderColor: scheme.zoomBorder,
+          fillerColor: scheme.zoomFill,
+          handleStyle: { color: scheme.zoomHandle, borderColor: scheme.zoomHandleBorder },
+          textStyle: { color: scheme.text },
           // Keep mousewheel pan behavior consistent with the inside zoom.
           zoomOnMouseWheel: 'ctrl',
           moveOnMouseWheel: true,
@@ -480,12 +533,12 @@ export function LiveTempChart(props: LiveTempChartProps) {
         // Prevent duplicate labels like 06:51 06:51 06:51 when the axis ticks are < 1 minute.
         minInterval: 60_000,
         axisLabel: {
-          color: 'rgba(255,255,255,0.70)',
+          color: scheme.text,
           formatter: (v: number) => fmtAxisTime(v),
           hideOverlap: true,
         },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLine: { lineStyle: { color: scheme.line } },
+        splitLine: { lineStyle: { color: scheme.grid } },
       },
       yAxis: {
         type: 'value',
@@ -494,22 +547,22 @@ export function LiveTempChart(props: LiveTempChartProps) {
         // using the same minimum keeps the axis legible in both scales).
         minInterval: 0.5,
         axisLabel: {
-          color: 'rgba(255,255,255,0.70)',
+          color: scheme.text,
           formatter: (v: number) => {
             const u = unitRef.current
             return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
           },
         },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLine: { lineStyle: { color: scheme.line } },
+        splitLine: { lineStyle: { color: scheme.grid } },
       },
       series: [
         {
           name: 'Actual',
           type: 'line',
           showSymbol: false,
-          itemStyle: { color: SERIES_ACTUAL_COLOR },
-          lineStyle: { width: 2, color: SERIES_ACTUAL_COLOR },
+          itemStyle: { color: scheme.seriesActual },
+          lineStyle: { width: 2, color: scheme.seriesActual },
           emphasis: { focus: 'series' },
           data: [] as Point[],
           sampling: 'lttb',
@@ -518,15 +571,15 @@ export function LiveTempChart(props: LiveTempChartProps) {
           name: 'Target',
           type: 'line',
           showSymbol: false,
-          itemStyle: { color: SERIES_TARGET_COLOR },
-          lineStyle: { width: 2, type: 'dashed', color: SERIES_TARGET_COLOR },
+          itemStyle: { color: scheme.seriesTarget },
+          lineStyle: { width: 2, type: 'dashed', color: scheme.seriesTarget },
           emphasis: { focus: 'series' },
           data: [] as Point[],
           sampling: 'lttb',
         },
       ],
     }),
-    [],
+    [scheme],
   )
 
   useEffect(() => {

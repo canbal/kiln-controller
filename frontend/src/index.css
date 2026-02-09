@@ -1,12 +1,4 @@
 :root {
-  --bg0: #0b0f17;
-  --bg1: #0d1624;
-  --card: rgba(255, 255, 255, 0.06);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.70);
-  --line: rgba(255, 255, 255, 0.12);
-  --accent: #f0b04a;
-
   font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", Arial, sans-serif;
   line-height: 1.5;
   font-weight: 500;
@@ -14,6 +6,35 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Theme tokens (solid background; no textures/gradients). */
+:root,
+:root[data-theme='stoneware'] {
+  /* Stoneware (cooler clay body + iron/umber accent). */
+  --bg0: #f3efe7;
+  --bg1: #f3efe7;
+  --card: #fbf8f2;
+
+  /* Ink */
+  --text: rgba(45, 35, 28, 0.92);
+  --muted: rgba(45, 35, 28, 0.62);
+
+  /* Lines and accents */
+  --line: rgba(70, 55, 44, 0.18);
+  --accent: #8a5a44;
+}
+
+:root[data-theme='dark'] {
+  /* Dark (kiln-night + ember accent). */
+  --bg0: #0d1114;
+  --bg1: #0d1114;
+  --card: rgba(255, 255, 255, 0.06);
+
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.70);
+  --line: rgba(255, 255, 255, 0.12);
+  --accent: #f0b04a;
 }
 
 * {
@@ -29,17 +50,7 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--text);
-  background:
-    radial-gradient(900px 700px at 20% 12%, rgba(240, 176, 74, 0.16), transparent 55%),
-    radial-gradient(800px 620px at 80% 26%, rgba(75, 160, 255, 0.12), transparent 60%),
-    repeating-linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.03),
-      rgba(255, 255, 255, 0.03) 2px,
-      transparent 2px,
-      transparent 10px
-    ),
-    linear-gradient(180deg, var(--bg0), var(--bg1));
+  background: var(--bg0);
 }
 
 code {
@@ -49,11 +60,9 @@ code {
 }
 
 a {
-  color: #ffd08a;
-  color: color-mix(in srgb, var(--accent) 92%, white);
+  color: color-mix(in srgb, var(--accent) 82%, black);
 }
 
 a:hover {
-  color: #ffbe66;
-  color: color-mix(in srgb, var(--accent) 70%, white);
+  color: color-mix(in srgb, var(--accent) 92%, black);
 }
