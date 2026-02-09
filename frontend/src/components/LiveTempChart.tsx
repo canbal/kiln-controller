@@ -150,7 +150,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const spanMs = readZoomSpanMs(chart)
     if (!spanMs) return
 
-    setZoomSpanLabel(`Span: ${formatSpan(spanMs)}`)
+    setZoomSpanLabel(formatSpan(spanMs))
     if (zoomSpanHideTimerRef.current !== null) {
       window.clearTimeout(zoomSpanHideTimerRef.current)
     }
