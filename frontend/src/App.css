@@ -290,6 +290,15 @@
   color: rgba(20, 83, 45, 0.92);
 }
 
+:root[data-theme='dark'] .badge--running {
+  border-color: rgba(86, 196, 110, 0.55);
+  background: rgba(86, 196, 110, 0.22);
+  color: rgba(210, 255, 224, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(86, 196, 110, 0.22),
+    0 10px 18px rgba(0, 0, 0, 0.28);
+}
+
 .badge--idle {
   border-color: color-mix(in srgb, var(--line) 92%, transparent);
   background: color-mix(in srgb, var(--card) 78%, transparent);
