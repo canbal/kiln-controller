@@ -97,6 +97,32 @@ You may want to change the configuration parameter **sensor_time_wait**. It's th
 
     $ source venv/bin/activate; ./kiln-controller.py
 
+### Raspberry Pi (real kiln / hardware mode)
+
+This is the normal setup when running on the Raspberry Pi connected to your kiln.
+
+1) Install full dependencies on the Pi:
+
+    $ cd kiln-controller
+    $ virtualenv -p python3 venv
+    $ source venv/bin/activate
+    $ export CFLAGS=-fcommon
+    $ pip3 install -r requirements.txt
+
+2) In `config.py`, set `simulate = False` and configure GPIO + thermocouple options for your hardware.
+
+3) Start the server:
+
+    $ source venv/bin/activate; ./kiln-controller.py
+
+4) Open:
+
+- `http://<pi-ip>:<listening_port>/picoreflow/index.html`
+
+Notes:
+
+- `listening_port` defaults to `80` in this repo; if you keep port 80 you may need to run as root or use a privileged service setup.
+
 ### Local Development (simulate mode)
 
 If you want to visually test the web UI locally (macOS/Linux) without Raspberry Pi hardware, run in simulation mode.
@@ -106,6 +132,8 @@ If you want to visually test the web UI locally (macOS/Linux) without Raspberry 
     $ python3 -m venv venv
     $ source venv/bin/activate
     $ pip install -r requirements-local.txt
+
+If you're on a Raspberry Pi and want real hardware support, use `requirements.txt` instead.
 
 2) In `config.py` set:
 
@@ -124,7 +152,7 @@ If you want to visually test the web UI locally (macOS/Linux) without Raspberry 
 Notes:
 
 - Port `80` requires elevated privileges on most machines; use `8080` locally.
-- Do not commit local-only `config.py` tweaks. You can discard changes with `git checkout -- config.py`.
+- Do not commit local-only `config.py` tweaks.
 
 ### Autostart Server onBoot
 If you want the server to autostart on boot, run the following command:
