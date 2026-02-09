@@ -13,6 +13,7 @@ This repo is expected to have multiple AI agents contributing over time.
 To keep work parallelizable and reviewable, follow these conventions:
 
 - One PR should implement one Task ID (or a tight group of adjacent Task IDs).
+- Always work on a branch and use PRs; do not push directly to the default branch (`master`/`main`).
 - Every PR that changes behavior should update this `TODO.md`:
   - mark the relevant Task ID(s) as DONE
   - add the merge commit SHA(s)
