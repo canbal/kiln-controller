@@ -242,7 +242,7 @@ Rules:
   - owner: @opencode
   - deps: `T-0001`
   - acceptance: fixtures exist and are referenced by docs/tests later
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/5
   - commit:
 
 - [ ] `T-0003` Add fixture JSON for `/api/stats` payload
