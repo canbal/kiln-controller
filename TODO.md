@@ -445,11 +445,11 @@ Rules:
   - commit: 1cbff47b4d75628db7e19f1f53ecb16b1bcde302
 
 - [ ] `T-0304` Continue recording after profile end until temp threshold/cap reached
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0303`
   - acceptance: post-profile cooling samples exist and stop at <200F/93C (or 48h)
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/30
   - commit:
 
 ### Milestone 4: Cooling Tail Visualization (Early Feature)

@@ -172,6 +172,34 @@ def handle_api():
 
     return { "success" : True }
 
+
+# Additive: stop cooldown-tail sampling early (does not affect kiln control).
+@app.post('/v1/cooldown/stop')
+def v1_stop_cooldown_capture():
+    try:
+        stopped = oven.stop_cooldown_capture()
+        bottle.response.content_type = 'application/json'
+        return json.dumps({"success": True, "stopped": bool(stopped)})
+    except Exception:
+        log.exception("/v1/cooldown/stop failed")
+        bottle.response.status = 500
+        bottle.response.content_type = 'application/json'
+        return json.dumps({"success": False, "error": "internal_error"})
+
+
+# Additive: stop cooldown capture for a specific session id.
+@app.post('/v1/sessions/<session_id>/cooldown/stop')
+def v1_stop_cooldown_capture_for_session(session_id):
+    try:
+        stopped = oven.stop_cooldown_capture(session_id=session_id)
+        bottle.response.content_type = 'application/json'
+        return json.dumps({"success": True, "stopped": bool(stopped)})
+    except Exception:
+        log.exception("/v1/sessions/%s/cooldown/stop failed" % session_id)
+        bottle.response.status = 500
+        bottle.response.content_type = 'application/json'
+        return json.dumps({"success": False, "error": "internal_error"})
+
 def find_profile(wanted):
     '''
     given a wanted profile name, find it and return the parsed

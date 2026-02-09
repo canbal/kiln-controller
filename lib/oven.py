@@ -255,7 +255,16 @@ class Oven(threading.Thread):
             self.lcd.write([0,0,0,0])
             self.lcd2.write([0,0,0,0])
 
+        # SQLite session lifecycle + sampling.
+        #
+        # - `_active_session_id`: current RUNNING session (profile executing)
+        # - `_cooldown_session_id`: session that has ended (COMPLETED) but we
+        #   continue sampling during natural cooling for a limited time.
         self._active_session_id: Optional[str] = None
+        self._cooldown_session_id: Optional[str] = None
+        self._cooldown_until_ts: Optional[float] = None
+        self._cooldown_started_ts: Optional[float] = None
+        self._session_lock = threading.Lock()
         self.reset()
 
     def reset(self):
@@ -313,8 +322,32 @@ class Oven(threading.Thread):
         finally:
             self._active_session_id = None
 
-    def _persist_sample_if_possible(self) -> None:
-        if not self._active_session_id:
+    def _cancel_cooldown_capture(self) -> None:
+        with self._session_lock:
+            self._cooldown_session_id = None
+            self._cooldown_until_ts = None
+            self._cooldown_started_ts = None
+
+    def stop_cooldown_capture(self, *, session_id: Optional[str] = None) -> bool:
+        """Stop cooldown capture early.
+
+        If `session_id` is provided, only stops if it matches the currently
+        active cooldown capture session.
+        """
+
+        with self._session_lock:
+            if not self._cooldown_session_id:
+                return False
+            if session_id and session_id != self._cooldown_session_id:
+                return False
+            self._cooldown_session_id = None
+            self._cooldown_until_ts = None
+            self._cooldown_started_ts = None
+            return True
+
+    def _persist_sample_if_possible(self, *, session_id: Optional[str] = None, state: Optional[dict] = None) -> None:
+        sid = session_id or self._active_session_id
+        if not sid:
             return
         if _sqlite_add_session_sample is None:
             return
@@ -322,15 +355,59 @@ class Oven(threading.Thread):
         if not db_path:
             return
 
-        sid = self._active_session_id
         try:
-            _sqlite_add_session_sample(db_path, session_id=sid, state=self.get_state())
+            _sqlite_add_session_sample(db_path, session_id=sid, state=state if state is not None else self.get_state())
         except Exception:
             # Best-effort: DB failures should never stop kiln control.
             log.exception("SQLite sample persist failed (id=%s)" % sid)
             return
 
+    def _cooldown_capture_threshold(self) -> float:
+        scale = getattr(config, "temp_scale", "f")
+        try:
+            scale = scale.lower()
+        except Exception:
+            scale = "f"
+        return 93.0 if scale == "c" else 200.0
+
+    def _start_cooldown_capture(self, *, session_id: str, now_ts: Optional[float] = None) -> None:
+        # Capture natural cooling tail beyond profile end.
+        # Stop when temp drops below threshold or after 48 hours (safety backstop).
+        now_ts = float(now_ts if now_ts is not None else time.time())
+        with self._session_lock:
+            self._cooldown_session_id = session_id
+            self._cooldown_until_ts = now_ts + (48 * 60 * 60)
+            self._cooldown_started_ts = now_ts
+
+    def _cooldown_capture_tick(self) -> None:
+        with self._session_lock:
+            sid = self._cooldown_session_id
+            until_ts = self._cooldown_until_ts
+        if not sid or until_ts is None:
+            return
+
+        now_ts = time.time()
+        if now_ts >= until_ts:
+            log.info("cooldown capture ended (48h cap reached)")
+            self._cancel_cooldown_capture()
+            return
+
+        st = self.get_state()
+        temp = st.get("temperature", 0)
+
+        # Best-effort: continue persisting even though session outcome is already finalized.
+        # If we just crossed below the threshold, persist one final sample < threshold,
+        # then stop further cooldown capture.
+        self._persist_sample_if_possible(session_id=sid, state=st)
+        if temp < self._cooldown_capture_threshold():
+            log.info("cooldown capture ended (temp=%.1f below threshold)" % float(temp))
+            self._cancel_cooldown_capture()
+            return
+
     def run_profile(self, profile, startat=0):
+        # Starting a new run should stop any prior cooldown capture.
+        self._cancel_cooldown_capture()
+
         # If a new run is started while another is active, treat the prior one as aborted.
         self._stop_session_if_possible(outcome="ABORTED")
         self.reset()
@@ -360,6 +437,8 @@ class Oven(threading.Thread):
         self._start_session_if_possible()
 
     def abort_run(self, *, outcome: str = "ABORTED"):
+        # User/emergency abort stops any cooldown capture.
+        self._cancel_cooldown_capture()
         self._stop_session_if_possible(outcome=outcome)
         self.reset()
         self.save_automatic_restart_state()
@@ -433,7 +512,28 @@ class Oven(threading.Thread):
         if self.runtime > self.totaltime:
             log.info("schedule ended, shutting down")
             log.info("total cost = %s%.2f" % (config.currency_type,self.cost))
-            self.abort_run(outcome="COMPLETED")
+
+            # Finalize the session outcome, but keep sampling during cooldown.
+            sid = self._active_session_id
+            if sid and _sqlite_stop_session is not None:
+                db_path = self._sqlite_db_path()
+                if db_path:
+                    try:
+                        _sqlite_stop_session(db_path, session_id=sid, outcome="COMPLETED")
+                        log.info("SQLite session ended: %s (outcome=COMPLETED)" % sid)
+                    except Exception:
+                        log.exception("SQLite session stop failed (id=%s)" % sid)
+
+            # Continue persisting samples into the (now-ended) session until kiln cools.
+            if sid:
+                self._start_cooldown_capture(session_id=sid)
+
+            # Clear active session id (session is no longer RUNNING).
+            self._active_session_id = None
+
+            # Reset kiln control state to IDLE (heater off).
+            self.reset()
+            self.save_automatic_restart_state()
 
     def update_cost(self):
         if self.heat:
@@ -462,6 +562,15 @@ class Oven(threading.Thread):
             temp = 0
             pass
 
+        now_ts = time.time()
+        with self._session_lock:
+            cooldown_sid = self._cooldown_session_id
+            cooldown_started_ts = self._cooldown_started_ts
+        cooldown_active = bool(cooldown_sid)
+        cooldown_elapsed = 0.0
+        if cooldown_active and cooldown_started_ts is not None:
+            cooldown_elapsed = max(0.0, now_ts - float(cooldown_started_ts))
+
         state = {
             'cost': self.cost,
             'runtime': self.runtime,
@@ -470,6 +579,10 @@ class Oven(threading.Thread):
             'state': self.state,
             'heat': self.heat,
             'totaltime': self.totaltime,
+            # Additive: natural cooldown tail capture metadata.
+            'cooldown_active': cooldown_active,
+            'cooldown_elapsed': cooldown_elapsed,
+            'cooldown_session_id': cooldown_sid,
             'kwh_rate': config.kwh_rate,
             'currency_type': config.currency_type,
             'profile': self.profile.name if self.profile else None,
@@ -540,7 +653,12 @@ class Oven(threading.Thread):
             if self.state == "IDLE":
                 if self.should_i_automatic_restart() == True:
                     self.automatic_restart()
-                time.sleep(1)
+
+                # If the last run completed, keep recording the cooling tail.
+                self._cooldown_capture_tick()
+
+                # Preserve legacy idle behavior unless we're actively capturing cooldown.
+                time.sleep(self.time_step if self._cooldown_session_id else 1)
                 continue
             if self.state == "RUNNING":
                 self.update_cost()
