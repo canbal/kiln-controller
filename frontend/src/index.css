@@ -1,0 +1,59 @@
+:root {
+  --bg0: #0b0f17;
+  --bg1: #0d1624;
+  --card: rgba(255, 255, 255, 0.06);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.70);
+  --line: rgba(255, 255, 255, 0.12);
+  --accent: #f0b04a;
+
+  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 500;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--text);
+  background:
+    radial-gradient(900px 700px at 20% 12%, rgba(240, 176, 74, 0.16), transparent 55%),
+    radial-gradient(800px 620px at 80% 26%, rgba(75, 160, 255, 0.12), transparent 60%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.03) 2px,
+      transparent 2px,
+      transparent 10px
+    ),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 0.95em;
+}
+
+a {
+  color: #ffd08a;
+  color: color-mix(in srgb, var(--accent) 92%, white);
+}
+
+a:hover {
+  color: #ffbe66;
+  color: color-mix(in srgb, var(--accent) 70%, white);
+}
