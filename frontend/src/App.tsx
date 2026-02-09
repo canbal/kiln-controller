@@ -102,9 +102,14 @@ function App() {
   const unit = cfg.tempScale === 'c' ? 'C' : cfg.tempScale === 'f' ? 'F' : ''
 
   const runtimeS = oven && Number.isFinite(oven.runtime) ? oven.runtime : null
+  const wallElapsedS = oven && typeof oven.elapsed === 'number' && Number.isFinite(oven.elapsed) ? oven.elapsed : null
   const totalS = oven && Number.isFinite(oven.totaltime) ? oven.totaltime : null
   const progressPct = running ? computeProgressPct(runtimeS, totalS) : null
   const remainingS = running && runtimeS !== null && totalS !== null ? Math.max(0, totalS - runtimeS) : null
+  const estRemainingS =
+    running && runtimeS !== null && runtimeS > 0 && wallElapsedS !== null && remainingS !== null
+      ? (wallElapsedS / runtimeS) * remainingS
+      : null
 
   return (
     <main className="app">
@@ -166,13 +171,23 @@ function App() {
             </div>
 
             <div className="tile">
-              <div className="tileLabel">Elapsed</div>
+              <div className="tileLabel">Runtime</div>
               <div className="tileValue tileValue--mono">{formatDurationSeconds(running ? runtimeS : null)}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Elapsed</div>
+              <div className="tileValue tileValue--mono">{formatDurationSeconds(running ? wallElapsedS : null)}</div>
             </div>
 
             <div className="tile">
               <div className="tileLabel">Remaining</div>
               <div className="tileValue tileValue--mono">{formatDurationSeconds(remainingS)}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Est remaining</div>
+              <div className="tileValue tileValue--mono">{formatDurationSeconds(estRemainingS)}</div>
             </div>
 
             <div className="tile tile--wide">

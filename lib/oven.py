@@ -256,6 +256,11 @@ class Oven(threading.Thread):
             self.lcd2.write([0,0,0,0])
 
         self._active_session_id: Optional[str] = None
+
+        # Wall-clock timing for UI/analytics.
+        # `runtime` is schedule time and can be paused/shifted by catch-up logic.
+        # `elapsed` is real time since the user started the run.
+        self._wall_start_ts: Optional[float] = None
         self.reset()
 
     def reset(self):
@@ -268,6 +273,7 @@ class Oven(threading.Thread):
         self.target = 0
         self.heat = 0
         self.pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
+        self._wall_start_ts = None
 
     def _sqlite_db_path(self) -> Optional[str]:
         return getattr(config, "sqlite_db_path", None)
@@ -351,6 +357,7 @@ class Oven(threading.Thread):
         self.startat = startat * 60
         self.runtime = self.startat
         self.start_time = datetime.datetime.now() - datetime.timedelta(seconds=self.startat)
+        self._wall_start_ts = time.time()
         self.profile = profile
         self.totaltime = profile.get_duration()
         self.state = "RUNNING"
@@ -462,9 +469,15 @@ class Oven(threading.Thread):
             temp = 0
             pass
 
+        now_ts = time.time()
+        elapsed = 0.0
+        if self._wall_start_ts is not None:
+            elapsed = max(0.0, now_ts - float(self._wall_start_ts))
+
         state = {
             'cost': self.cost,
             'runtime': self.runtime,
+            'elapsed': elapsed,
             'temperature': temp,
             'target': self.target,
             'state': self.state,
