@@ -398,6 +398,27 @@
   transform: translateY(1px);
 }
 
+/* Temporary span hint while zooming */
+.chartZoomSpan {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: rgba(10, 14, 22, 0.72);
+  color: color-mix(in srgb, var(--text) 92%, transparent);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+  pointer-events: none;
+ }
+
 .liveChart {
   width: 100%;
   height: 260px;

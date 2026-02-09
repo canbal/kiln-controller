@@ -59,6 +59,9 @@ export function LiveTempChart(props: LiveTempChartProps) {
   // If the user manually zooms/pans, we stop enforcing this until they hit Reset.
   const autoLiveWindowRef = useRef(true)
 
+  const [zoomSpanLabel, setZoomSpanLabel] = useState<string | null>(null)
+  const zoomSpanHideTimerRef = useRef<number | null>(null)
+
   const seededRef = useRef(false)
   const lastPointAtRef = useRef<number | null>(null)
   const actualRef = useRef<Point[]>([])
@@ -106,6 +109,55 @@ export function LiveTempChart(props: LiveTempChartProps) {
       startPct: Math.max(0, Math.min(100, startPct)),
       endPct: Math.max(0, Math.min(100, endPct)),
     }
+  }
+
+  const readZoomSpanMs = (chart: EChartsType): number | null => {
+    const opt = chart.getOption()
+    const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as Record<string, unknown> | undefined) : undefined
+    if (!zoom0) return null
+
+    const startValue = typeof zoom0.startValue === 'number' ? zoom0.startValue : null
+    const endValue = typeof zoom0.endValue === 'number' ? zoom0.endValue : null
+    if (startValue !== null && endValue !== null && endValue > startValue) {
+      return endValue - startValue
+    }
+
+    const start = typeof zoom0.start === 'number' ? zoom0.start : null
+    const end = typeof zoom0.end === 'number' ? zoom0.end : null
+    const extent = timeExtent()
+    if (!extent || start === null || end === null) return null
+
+    const spanPct = Math.max(0, Math.min(100, end - start)) / 100
+    const span = (extent.max - extent.min) * spanPct
+    return span > 0 ? span : null
+  }
+
+  const formatSpan = (ms: number): string => {
+    const s = ms / 1000
+    if (s >= 3600) {
+      const h = Math.max(1, Math.round(s / 3600))
+      return `${h} hr`
+    }
+    if (s >= 60) {
+      const m = Math.max(1, Math.round(s / 60))
+      return `${m} min`
+    }
+    const sec = Math.max(1, Math.round(s))
+    return `${sec} sec`
+  }
+
+  const showZoomSpanHint = (chart: EChartsType) => {
+    const spanMs = readZoomSpanMs(chart)
+    if (!spanMs) return
+
+    setZoomSpanLabel(`Span: ${formatSpan(spanMs)}`)
+    if (zoomSpanHideTimerRef.current !== null) {
+      window.clearTimeout(zoomSpanHideTimerRef.current)
+    }
+    zoomSpanHideTimerRef.current = window.setTimeout(() => {
+      zoomSpanHideTimerRef.current = null
+      setZoomSpanLabel(null)
+    }, 900)
   }
 
   const resetToLive = () => {
@@ -294,9 +346,11 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const onDataZoom = () => {
       if (programmaticZoomRef.current) return
 
+      showZoomSpanHint(chart)
+
       // Any manual dataZoom interaction disables the default auto live window.
       autoLiveWindowRef.current = false
-      if (autoLiveWindow) setAutoLiveWindow(false)
+      setAutoLiveWindow(false)
 
       // Keep following live only if the window end is "now".
       // If the user pans away (end < ~100%), stop following until reset.
@@ -471,6 +525,15 @@ export function LiveTempChart(props: LiveTempChartProps) {
     }
   }, [props.state, maxPoints])
 
+  useEffect(() => {
+    return () => {
+      if (zoomSpanHideTimerRef.current !== null) {
+        window.clearTimeout(zoomSpanHideTimerRef.current)
+        zoomSpanHideTimerRef.current = null
+      }
+    }
+  }, [])
+
   return (
     <div className="liveChartWrap" aria-label="Live temperature chart">
       {!followLive || !autoLiveWindow ? (
@@ -478,6 +541,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
           Reset
         </button>
       ) : null}
+      {zoomSpanLabel ? <div className="chartZoomSpan" aria-live="polite">{zoomSpanLabel}</div> : null}
       <div ref={hostRef} className="liveChart" />
     </div>
   )
