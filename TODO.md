@@ -504,7 +504,7 @@ Rules:
   - owner: @opencode
   - deps: `T-0401`
   - acceptance: notes persist across restarts
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/38
   - commit:
 
 - [ ] `T-0602` New UI: session list + detail page + notes editing
