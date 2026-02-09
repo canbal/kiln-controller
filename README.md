@@ -65,8 +65,8 @@ Download [Raspberry PI OS](https://www.raspberrypi.org/software/). Use Rasberry 
     $ sudo apt-get install python3-dev python3-virtualenv libevent-dev virtualenv
     $ git clone https://github.com/jbruce12000/kiln-controller
     $ cd kiln-controller
-    $ virtualenv -p python3 venv
-    $ source venv/bin/activate
+    $ virtualenv -p python3 kilnenv
+    $ source kilnenv/bin/activate
     $ export CFLAGS=-fcommon
     $ pip3 install --upgrade setuptools
     $ pip3 install greenlet bottle gevent gevent-websocket
@@ -78,8 +78,8 @@ Download [Raspberry PI OS](https://www.raspberrypi.org/software/). Use Rasberry 
 If you're done playing around with simulations and want to deploy the code on a Raspberry PI to control a kiln, you'll need to do this in addition to the stuff listed above:
 
     $ cd kiln-controller
-    $ virtualenv -p python3 venv
-    $ source venv/bin/activate
+    $ virtualenv -p python3 kilnenv
+    $ source kilnenv/bin/activate
     $ export CFLAGS=-fcommon
     $ pip3 install -r requirements.txt
 
@@ -99,7 +99,7 @@ This project is primarily intended to run on a Raspberry Pi connected to a kiln.
 
 After you've installed dependencies on the Pi (see **Raspberry PI deployment** above), start the server:
 
-    $ source venv/bin/activate; ./kiln-controller.py
+    $ source kilnenv/bin/activate; ./kiln-controller.py
 
 Then open:
 
@@ -115,8 +115,8 @@ This is for visual testing and development on non-Raspberry Pi machines without 
 
 1) Create a virtualenv and install local-only deps:
 
-    $ python3 -m venv venv
-    $ source venv/bin/activate
+    $ python3 -m venv kilnenv
+    $ source kilnenv/bin/activate
     $ pip install -r requirements-local.txt
 
 If you're on a Raspberry Pi and want real hardware support, use `requirements.txt` instead.
@@ -127,7 +127,7 @@ If you're on a Raspberry Pi and want real hardware support, use `requirements.tx
 
 3) Start the server:
 
-    $ source venv/bin/activate; DEVELOPMENT=1 ./kiln-controller.py
+    $ source kilnenv/bin/activate; DEVELOPMENT=1 ./kiln-controller.py
 
 4) Open in a browser:
 

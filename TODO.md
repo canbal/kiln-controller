@@ -36,11 +36,11 @@ To keep work parallelizable and reviewable, follow these conventions:
 
 Goal: run the server locally without Pi hardware.
 
-1) Create and activate a venv, install deps:
+1) Create and activate a virtualenv, install deps:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv kilnenv
+source kilnenv/bin/activate
 pip install -r requirements-local.txt
 ```
 
@@ -55,7 +55,7 @@ If local installs still fail on macOS, use the Docker path below instead.
 3) Run the server:
 
 ```bash
-source venv/bin/activate && DEVELOPMENT=1 ./kiln-controller.py
+source kilnenv/bin/activate && DEVELOPMENT=1 ./kiln-controller.py
 ```
 
 4) Open:
@@ -83,8 +83,8 @@ docker run --rm -it \
 Inside the container:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
+python -m venv kilnenv
+source kilnenv/bin/activate
 pip install -r requirements.txt
 ```
 
