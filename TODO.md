@@ -471,13 +471,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/33
   - commit: 06df8c3
 
-- [ ] `T-0402` New UI: show most recent session chart with cooling tail + markers
-  - status: IN_PROGRESS
+- [x] `T-0402` New UI: show most recent session chart with cooling tail + markers
+  - status: DONE
   - owner: @opencode
   - deps: `T-0401`, `T-0203`
   - acceptance: chart shows tail beyond end-of-profile and indicates end marker
   - PR: https://github.com/canbal/kiln-controller/pull/36
-  - commit:
+  - commit: 2e5f420
 
 ### Milestone 5: Minimal Controls in New UI (Optional)
 
