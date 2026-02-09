@@ -21,9 +21,23 @@ function formatTemp(v: number | null | undefined): string {
   return String(Math.round(v))
 }
 
-function formatNumber(v: number | null | undefined, digits = 1): string {
-  if (v === null || v === undefined) return '--'
-  return Number.isFinite(v) ? v.toFixed(digits) : '--'
+function formatPowerPct(oven: { heat?: number | null; pidstats?: Record<string, number> | null } | null): string {
+  const out = oven?.pidstats && typeof oven.pidstats.out === 'number' ? oven.pidstats.out : null
+  if (out !== null && Number.isFinite(out)) {
+    return String(Math.round(out * 100))
+  }
+
+  const heat = oven?.heat ?? null
+  if (heat === null || heat === undefined) return '--'
+  if (!Number.isFinite(heat)) return '--'
+
+  // Contract notes:
+  // - real oven: heat is 0.0 or 1.0
+  // - simulated: heat is seconds-on during the last control window
+  // In both cases, with the default 1s control window, 1.0 means 100%.
+  if (heat >= 0 && heat <= 1.2) return String(Math.round(heat * 100))
+  if (heat > 1.2 && heat <= 100) return String(Math.round(heat))
+  return '--'
 }
 
 function connectionLabel(s: string): string {
@@ -110,8 +124,8 @@ function App() {
             </div>
 
             <div className="tile">
-              <div className="tileLabel">Heat</div>
-              <div className="tileValue">{formatNumber(oven?.heat, 0)}%</div>
+              <div className="tileLabel">Power</div>
+              <div className="tileValue">{formatPowerPct(oven)}%</div>
             </div>
 
             <div className="tile tile--wide">
