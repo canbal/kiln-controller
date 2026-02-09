@@ -463,11 +463,11 @@ Rules:
 ### Milestone 4: Cooling Tail Visualization (Early Feature)
 
 - [ ] `T-0401` Add `/v1/sessions` and `/v1/sessions/:id/samples` read endpoints
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0304`
   - acceptance: curl can list sessions and fetch a sample window
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/33
   - commit:
 
 - [ ] `T-0402` New UI: show most recent session chart with cooling tail + markers
