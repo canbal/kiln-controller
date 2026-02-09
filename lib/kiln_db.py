@@ -14,7 +14,7 @@ class Migration:
     statements: Iterable[str]
 
 
-LATEST_SCHEMA_VERSION = 1
+LATEST_SCHEMA_VERSION = 2
 
 
 MIGRATIONS = {
@@ -48,6 +48,21 @@ MIGRATIONS = {
             "CREATE INDEX IF NOT EXISTS idx_session_samples_session_id_t ON session_samples(session_id, t)",
         ),
     )
+    ,
+    2: Migration(
+        version=2,
+        name="init_settings",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+              k TEXT PRIMARY KEY,
+              v TEXT NOT NULL,
+              updated_at INTEGER NOT NULL
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_settings_updated_at ON settings(updated_at)",
+        ),
+    ),
 }
 
 
@@ -98,6 +113,40 @@ def ensure_db(db_path: Optional[str] = None, *, log=None) -> str:
         conn.close()
 
     return db_path
+
+
+def get_setting(db_path: str, *, key: str) -> Optional[str]:
+    """Fetch a small string setting value, or None if not found."""
+
+    conn = _connect_configured(db_path)
+    try:
+        row = conn.execute("SELECT v FROM settings WHERE k = ?", (key,)).fetchone()
+        return str(row["v"]) if row else None
+    finally:
+        conn.close()
+
+
+def set_setting(db_path: str, *, key: str, value: str, updated_at: Optional[int] = None) -> None:
+    """Upsert a small string setting."""
+
+    updated_at = int(updated_at if updated_at is not None else time.time())
+    conn = _connect_configured(db_path)
+    try:
+        conn.execute("BEGIN")
+        conn.execute(
+            """
+            INSERT INTO settings(k, v, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at
+            """,
+            (key, value, updated_at),
+        )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
 
 
 def create_session(

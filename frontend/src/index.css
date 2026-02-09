@@ -10,21 +10,6 @@
 
 /* Theme tokens (solid background; no textures/gradients). */
 :root,
-:root[data-theme='paper'] {
-  /* Paper (warm studio paper + terracotta accent). */
-  --bg0: #fbf7f0;
-  --bg1: #fbf7f0;
-  --card: #fffdf8;
-
-  /* Ink */
-  --text: rgba(58, 40, 27, 0.92);
-  --muted: rgba(58, 40, 27, 0.62);
-
-  /* Lines and accents */
-  --line: rgba(90, 64, 44, 0.16);
-  --accent: #c56a2d;
-}
-
 :root[data-theme='stoneware'] {
   /* Stoneware (cooler clay body + iron/umber accent). */
   --bg0: #f3efe7;
@@ -38,6 +23,18 @@
   /* Lines and accents */
   --line: rgba(70, 55, 44, 0.18);
   --accent: #8a5a44;
+}
+
+:root[data-theme='dark'] {
+  /* Dark (kiln-night + ember accent). */
+  --bg0: #0d1114;
+  --bg1: #0d1114;
+  --card: rgba(255, 255, 255, 0.06);
+
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.70);
+  --line: rgba(255, 255, 255, 0.12);
+  --accent: #f0b04a;
 }
 
 * {

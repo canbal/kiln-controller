@@ -4,6 +4,8 @@ import { useStatusWs } from './ws/status'
 import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
 import { RecentSessionChart } from './components/RecentSessionChart'
+import { apiGetTheme, apiSetTheme } from './api/settings'
+import type { UiTheme } from './api/settings'
 
 function formatTime(d: Date | null): string {
   if (!d) return 'never'
@@ -103,26 +105,40 @@ function App() {
   const running = oven?.state === 'RUNNING'
   const unit = cfg.tempScale === 'c' ? 'C' : cfg.tempScale === 'f' ? 'F' : ''
 
-  const [theme, setTheme] = useState<'paper' | 'stoneware'>(() => {
-    try {
-      const qp = new URLSearchParams(window.location.search).get('theme')
-      if (qp === 'stoneware' || qp === 'paper') return qp
-      const saved = window.localStorage.getItem('kiln_app_theme')
-      if (saved === 'stoneware' || saved === 'paper') return saved
-    } catch {
-      // ignore
-    }
-    return 'paper'
-  })
+  const [theme, setTheme] = useState<UiTheme>('stoneware')
+  const [themeErr, setThemeErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    const ac = new AbortController()
+    apiGetTheme({ signal: ac.signal }).then((res) => {
+      if (!res.ok) {
+        setThemeErr(res.error)
+        return
+      }
+      setTheme(res.value)
+    })
+    return () => ac.abort()
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    try {
-      window.localStorage.setItem('kiln_app_theme', theme)
-    } catch {
-      // ignore
-    }
   }, [theme])
+
+  const toggleTheme = async () => {
+    const next: UiTheme = theme === 'dark' ? 'stoneware' : 'dark'
+    setTheme(next)
+    setThemeErr(null)
+    const res = await apiSetTheme(next)
+    if (!res.ok) {
+      setThemeErr(res.error)
+      // best-effort rollback to the previous theme
+      setTheme(theme)
+      return
+    }
+    setTheme(res.value)
+  }
+
+  const isDark = theme === 'dark'
 
   const runtimeS = oven && Number.isFinite(oven.runtime) ? oven.runtime : null
   const wallElapsedS = oven && typeof oven.elapsed === 'number' && Number.isFinite(oven.elapsed) ? oven.elapsed : null
@@ -152,23 +168,34 @@ function App() {
             <span className="dot" aria-hidden="true" />
             {connectionLabel(status.connection)}
           </div>
-          <div className="pill themePill" role="group" aria-label="Theme">
-            <span className="themeLabel">Theme</span>
-            <button
-              type="button"
-              className={`themeBtn ${theme === 'paper' ? 'isActive' : ''}`}
-              onClick={() => setTheme('paper')}
-            >
-              Paper
-            </button>
-            <button
-              type="button"
-              className={`themeBtn ${theme === 'stoneware' ? 'isActive' : ''}`}
-              onClick={() => setTheme('stoneware')}
-            >
-              Stoneware
-            </button>
-          </div>
+          <button
+            type="button"
+            className="pill themeToggle"
+            aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-pressed={isDark}
+            onClick={toggleTheme}
+            title={isDark ? 'Light theme' : 'Dark theme'}
+          >
+            <span className="themeIcon" aria-hidden="true">
+              {isDark ? (
+                // Sun (to switch to light)
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path
+                    fill="currentColor"
+                    d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12Zm0-14.5a1 1 0 0 1 1 1V5a1 1 0 1 1-2 0V4.5a1 1 0 0 1 1-1Zm0 15.5a1 1 0 0 1 1 1V20a1 1 0 1 1-2 0v-.5a1 1 0 0 1 1-1ZM4.5 11a1 1 0 0 1 1 1 1 1 0 0 1-1 1H4a1 1 0 1 1 0-2h.5Zm15.5 0a1 1 0 0 1 1 1 1 1 0 0 1-1 1H19a1 1 0 1 1 0-2h1Zm-2.23-6.77a1 1 0 0 1 1.41 0l.36.36a1 1 0 1 1-1.41 1.41l-.36-.36a1 1 0 0 1 0-1.41ZM5.46 16.54a1 1 0 0 1 1.41 0l.36.36a1 1 0 1 1-1.41 1.41l-.36-.36a1 1 0 0 1 0-1.41Zm13.72 1.77a1 1 0 0 1 0 1.41l-.36.36a1 1 0 1 1-1.41-1.41l.36-.36a1 1 0 0 1 1.41 0ZM6.87 5.64a1 1 0 0 1 0 1.41l-.36.36A1 1 0 0 1 5.1 6l.36-.36a1 1 0 0 1 1.41 0Z"
+                  />
+                </svg>
+              ) : (
+                // Moon (to switch to dark)
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path
+                    fill="currentColor"
+                    d="M21 14.5A8.5 8.5 0 0 1 9.5 3a7 7 0 1 0 11.5 11.5Z"
+                  />
+                </svg>
+              )}
+            </span>
+          </button>
         </div>
       </header>
 
@@ -276,6 +303,7 @@ function App() {
           </div>
           <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} theme={theme} />
           <p className="muted chartHint">Scroll/2-finger to pan. Pinch (or ctrl+scroll) to zoom. Drag to pan.</p>
+          {themeErr ? <p className="muted">Theme save error: {themeErr}</p> : null}
         </article>
 
         <article className="card card--span2" aria-label="Recent session chart">

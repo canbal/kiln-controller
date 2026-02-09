@@ -18,7 +18,7 @@ class TestKilnDbMigrations(unittest.TestCase):
             conn = connect(db_path)
             try:
                 version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
-                self.assertEqual(int(version), 1)
+                self.assertEqual(int(version), 2)
 
                 tables = {
                     r[0]
@@ -29,6 +29,7 @@ class TestKilnDbMigrations(unittest.TestCase):
                 self.assertIn("schema_version", tables)
                 self.assertIn("sessions", tables)
                 self.assertIn("session_samples", tables)
+                self.assertIn("settings", tables)
             finally:
                 conn.close()
 
@@ -41,7 +42,7 @@ class TestKilnDbMigrations(unittest.TestCase):
             conn = connect(db_path)
             try:
                 version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
-                self.assertEqual(int(version), 1)
+                self.assertEqual(int(version), 2)
             finally:
                 conn.close()
 

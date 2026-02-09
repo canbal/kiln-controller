@@ -20,7 +20,7 @@ type LiveTempChartProps = {
   state: OvenState | null
   backlog: StatusBacklogEnvelope | null
   tempScale: 'f' | 'c' | null
-  theme?: 'paper' | 'stoneware'
+  theme?: 'stoneware' | 'dark'
 }
 
 function fmtTemp(v: number): string {
@@ -65,7 +65,7 @@ type ChartScheme = {
   zoomHandleBorder: string
 }
 
-function schemeForTheme(theme: 'paper' | 'stoneware'): ChartScheme {
+function schemeForTheme(theme: 'stoneware' | 'dark'): ChartScheme {
   if (theme === 'stoneware') {
     return {
       seriesActual: 'rgba(56, 109, 140, 0.95)',
@@ -84,26 +84,26 @@ function schemeForTheme(theme: 'paper' | 'stoneware'): ChartScheme {
     }
   }
 
-  // paper
+  // dark
   return {
-    seriesActual: 'rgba(56, 109, 140, 0.95)',
-    seriesTarget: 'rgba(197, 106, 45, 0.95)',
-    text: 'rgba(58, 40, 27, 0.72)',
-    textStrong: 'rgba(58, 40, 27, 0.92)',
-    line: 'rgba(90, 64, 44, 0.22)',
-    grid: 'rgba(90, 64, 44, 0.08)',
-    tooltipBg: 'rgba(255, 253, 248, 0.98)',
-    tooltipBorder: 'rgba(90, 64, 44, 0.16)',
-    zoomBg: 'rgba(90, 64, 44, 0.04)',
-    zoomBorder: 'rgba(90, 64, 44, 0.14)',
-    zoomFill: 'rgba(197, 106, 45, 0.18)',
-    zoomHandle: 'rgba(197, 106, 45, 0.55)',
-    zoomHandleBorder: 'rgba(197, 106, 45, 0.28)',
+    seriesActual: 'rgba(75, 160, 255, 0.95)',
+    seriesTarget: 'rgba(240, 176, 74, 0.95)',
+    text: 'rgba(255, 255, 255, 0.78)',
+    textStrong: 'rgba(255, 255, 255, 0.92)',
+    line: 'rgba(255, 255, 255, 0.16)',
+    grid: 'rgba(255, 255, 255, 0.08)',
+    tooltipBg: 'rgba(12, 18, 28, 0.92)',
+    tooltipBorder: 'rgba(255, 255, 255, 0.14)',
+    zoomBg: 'rgba(255, 255, 255, 0.06)',
+    zoomBorder: 'rgba(255, 255, 255, 0.14)',
+    zoomFill: 'rgba(240, 176, 74, 0.20)',
+    zoomHandle: 'rgba(240, 176, 74, 0.65)',
+    zoomHandleBorder: 'rgba(240, 176, 74, 0.35)',
   }
 }
 
 export function LiveTempChart(props: LiveTempChartProps) {
-  const theme = props.theme ?? 'paper'
+  const theme = props.theme ?? 'stoneware'
   const scheme = useMemo(() => schemeForTheme(theme), [theme])
   const hostRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<EChartsType | null>(null)

@@ -29,7 +29,7 @@ type Point = [number, number | null]
 
 type RecentSessionChartProps = {
   tempScale: 'f' | 'c' | null
-  theme?: 'paper' | 'stoneware'
+  theme?: 'stoneware' | 'dark'
 }
 
 type ChartScheme = {
@@ -57,7 +57,7 @@ type ChartScheme = {
   tailLabel: string
 }
 
-function schemeForTheme(theme: 'paper' | 'stoneware'): ChartScheme {
+function schemeForTheme(theme: 'stoneware' | 'dark'): ChartScheme {
   if (theme === 'stoneware') {
     return {
       text: 'rgba(45, 35, 28, 0.72)',
@@ -85,30 +85,30 @@ function schemeForTheme(theme: 'paper' | 'stoneware'): ChartScheme {
     }
   }
 
-  // paper
+  // dark
   return {
-    text: 'rgba(58, 40, 27, 0.72)',
-    textStrong: 'rgba(58, 40, 27, 0.92)',
-    line: 'rgba(90, 64, 44, 0.22)',
-    grid: 'rgba(90, 64, 44, 0.08)',
-    tooltipBg: 'rgba(255, 253, 248, 0.98)',
-    tooltipBorder: 'rgba(90, 64, 44, 0.16)',
+    text: 'rgba(255, 255, 255, 0.78)',
+    textStrong: 'rgba(255, 255, 255, 0.92)',
+    line: 'rgba(255, 255, 255, 0.16)',
+    grid: 'rgba(255, 255, 255, 0.08)',
+    tooltipBg: 'rgba(12, 18, 28, 0.92)',
+    tooltipBorder: 'rgba(255, 255, 255, 0.14)',
 
-    zoomBg: 'rgba(90, 64, 44, 0.04)',
-    zoomBorder: 'rgba(90, 64, 44, 0.14)',
-    zoomFill: 'rgba(197, 106, 45, 0.10)',
-    zoomHandle: 'rgba(197, 106, 45, 0.40)',
-    zoomHandleBorder: 'rgba(197, 106, 45, 0.22)',
+    zoomBg: 'rgba(255, 255, 255, 0.06)',
+    zoomBorder: 'rgba(255, 255, 255, 0.14)',
+    zoomFill: 'rgba(180, 200, 220, 0.14)',
+    zoomHandle: 'rgba(180, 200, 220, 0.52)',
+    zoomHandleBorder: 'rgba(180, 200, 220, 0.28)',
 
-    seriesActual: 'rgba(56, 109, 140, 0.95)',
-    seriesTarget: 'rgba(197, 106, 45, 0.95)',
-    seriesTail: 'rgba(158, 141, 126, 0.92)',
+    seriesActual: 'rgba(75, 160, 255, 0.95)',
+    seriesTarget: 'rgba(240, 176, 74, 0.95)',
+    seriesTail: 'rgba(184, 198, 214, 0.92)',
 
-    markerLine: 'rgba(197, 106, 45, 0.85)',
-    markerLabelBg: 'rgba(255, 253, 248, 0.92)',
-    markerLabelBorder: 'rgba(197, 106, 45, 0.25)',
-    tailShade: 'rgba(158, 141, 126, 0.10)',
-    tailLabel: 'rgba(90, 64, 44, 0.62)',
+    markerLine: 'rgba(240, 176, 74, 0.85)',
+    markerLabelBg: 'rgba(12, 18, 28, 0.72)',
+    markerLabelBorder: 'rgba(240, 176, 74, 0.25)',
+    tailShade: 'rgba(184, 198, 214, 0.08)',
+    tailLabel: 'rgba(184, 198, 214, 0.78)',
   }
 }
 
@@ -170,7 +170,7 @@ function dedupeByT(samples: SessionSample[]): SessionSample[] {
 }
 
 export function RecentSessionChart(props: RecentSessionChartProps) {
-  const theme = props.theme ?? 'paper'
+  const theme = props.theme ?? 'stoneware'
   const scheme = useMemo(() => schemeForTheme(theme), [theme])
 
   const hostRef = useRef<HTMLDivElement | null>(null)
