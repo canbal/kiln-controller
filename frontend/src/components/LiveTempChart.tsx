@@ -45,6 +45,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const [followLive, setFollowLive] = useState(true)
   const followLiveRef = useRef(true)
   const programmaticZoomRef = useRef(false)
+  const zoomSpanPctRef = useRef(20)
 
   const seededRef = useRef(false)
   const lastPointAtRef = useRef<number | null>(null)
@@ -59,6 +60,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
     setFollowLive(true)
     if (!chart) return
 
+    zoomSpanPctRef.current = 20
     programmaticZoomRef.current = true
     chart.dispatchAction({ type: 'dataZoom', start: 80, end: 100 })
     window.setTimeout(() => {
@@ -147,7 +149,25 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     const onDataZoom = () => {
       if (programmaticZoomRef.current) return
-      // User interacted (zoom/pan) -> stop auto-following.
+
+      // Keep following live only if the window end is "now".
+      // If the user pans away (end < ~100%), stop following until reset.
+      const opt = chart.getOption()
+      const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as { start?: number; end?: number } | undefined) : undefined
+      const start = typeof zoom0?.start === 'number' ? zoom0.start : 80
+      const end = typeof zoom0?.end === 'number' ? zoom0.end : 100
+      const span = Math.max(0, Math.min(100, end - start))
+
+      // When zoomed/panned but still at the live edge, preserve the zoom level.
+      if (end >= 99.5) {
+        zoomSpanPctRef.current = span
+        if (!followLiveRef.current) {
+          followLiveRef.current = true
+          setFollowLive(true)
+        }
+        return
+      }
+
       followLiveRef.current = false
       setFollowLive(false)
     }
@@ -227,8 +247,19 @@ export function LiveTempChart(props: LiveTempChartProps) {
     )
 
     if (followLiveRef.current) {
+      // Preserve current zoom level; pin it to the live edge.
+      const opt = chart.getOption()
+      const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as { start?: number; end?: number } | undefined) : undefined
+      const start = typeof zoom0?.start === 'number' ? zoom0.start : 80
+      const end = typeof zoom0?.end === 'number' ? zoom0.end : 100
+      const span = Math.max(0, Math.min(100, end - start))
+      if (span > 0) zoomSpanPctRef.current = span
+
+      const nextEnd = 100
+      const nextStart = Math.max(0, nextEnd - zoomSpanPctRef.current)
+
       programmaticZoomRef.current = true
-      chart.dispatchAction({ type: 'dataZoom', start: 80, end: 100 })
+      chart.dispatchAction({ type: 'dataZoom', start: nextStart, end: nextEnd })
       window.setTimeout(() => {
         programmaticZoomRef.current = false
       }, 0)
