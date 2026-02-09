@@ -542,11 +542,11 @@ Rules:
   - commit: 1e8e9ef
 
 - [ ] `T-0602` New UI: session list + detail page + notes editing
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0601`
   - acceptance: user can browse and annotate past firings on phone
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/45
   - commit:
 
 ### Milestones 7-10: Later Work (Config, Profile Editing, Decommission)
