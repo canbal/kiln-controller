@@ -111,6 +111,12 @@ function App() {
       ? (wallElapsedS / runtimeS) * remainingS
       : null
 
+  const cooldownActive = oven?.cooldown_active === true
+  const cooldownElapsedS =
+    cooldownActive && typeof oven?.cooldown_elapsed === 'number' && Number.isFinite(oven.cooldown_elapsed)
+      ? oven.cooldown_elapsed
+      : null
+
   return (
     <main className="app">
       <header className="top">
@@ -188,6 +194,13 @@ function App() {
             <div className="tile">
               <div className="tileLabel">Est remaining</div>
               <div className="tileValue tileValue--mono">{formatDurationSeconds(estRemainingS)}</div>
+            </div>
+
+            <div className="tile">
+              <div className="tileLabel">Cooldown</div>
+              <div className="tileValue tileValue--mono">
+                {cooldownActive ? formatDurationSeconds(cooldownElapsedS) : '--'}
+              </div>
             </div>
 
             <div className="tile tile--wide">

@@ -422,7 +422,7 @@ Rules:
   - status: IN_PROGRESS
   - owner: @opencode
   - deps: `T-0202`
-  - acceptance: `/app` shows progress %, elapsed time, and estimated time remaining when RUNNING
+  - acceptance: `/app` shows progress %, runtime vs elapsed, remaining, and adjusted ETA; shows cooldown timer when cooldown capture is active
   - PR: https://github.com/canbal/kiln-controller/pull/31
   - commit:
 

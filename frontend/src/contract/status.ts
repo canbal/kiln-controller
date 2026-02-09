@@ -21,6 +21,10 @@ export const ovenStateSchema = z
     runtime: z.number(),
     // Additive: wall-clock seconds since the run was started (not paused by catch-up logic).
     elapsed: z.number().optional(),
+    // Additive: natural cooldown tail capture.
+    cooldown_active: z.boolean().optional(),
+    cooldown_elapsed: z.number().optional(),
+    cooldown_session_id: z.string().nullable().optional(),
     temperature: z.number(),
     target: z.number(),
     state: z.enum(['IDLE', 'RUNNING']),
