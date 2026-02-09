@@ -372,11 +372,11 @@ Rules:
   - commit: 507073b348796a89ec06b8a3a53f5b3f0e7e1035
 
 - [ ] `T-0202` Add read-only dashboard metrics (temp/target/state) optimized for small screens
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0201`
   - acceptance: phone layout is usable without horizontal scrolling
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/18
   - commit:
 
 - [ ] `T-0203` Add ECharts live plot (actual temp + target when available)
