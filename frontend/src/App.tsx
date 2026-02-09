@@ -4,8 +4,7 @@ import { useStatusWs } from './ws/status'
 import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
 import { RecentSessionChart } from './components/RecentSessionChart'
-import { apiGetTheme, apiSetTheme } from './api/settings'
-import type { UiTheme } from './api/settings'
+type UiTheme = 'stoneware' | 'dark'
 
 function formatTime(d: Date | null): string {
   if (!d) return 'never'
@@ -105,37 +104,33 @@ function App() {
   const running = oven?.state === 'RUNNING'
   const unit = cfg.tempScale === 'c' ? 'C' : cfg.tempScale === 'f' ? 'F' : ''
 
-  const [theme, setTheme] = useState<UiTheme>('stoneware')
-  const [themeErr, setThemeErr] = useState<string | null>(null)
+  const [theme, setTheme] = useState<UiTheme>(() => {
+    try {
+      const qp = new URLSearchParams(window.location.search).get('theme')
+      if (qp === 'dark' || qp === 'stoneware') return qp
 
-  useEffect(() => {
-    const ac = new AbortController()
-    apiGetTheme({ signal: ac.signal }).then((res) => {
-      if (!res.ok) {
-        setThemeErr(res.error)
-        return
-      }
-      setTheme(res.value)
-    })
-    return () => ac.abort()
-  }, [])
+      const saved = window.localStorage.getItem('kiln_app_theme')
+      if (saved === 'dark' || saved === 'stoneware') return saved
+
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark'
+    } catch {
+      // ignore
+    }
+    return 'stoneware'
+  })
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
+    try {
+      window.localStorage.setItem('kiln_app_theme', theme)
+    } catch {
+      // ignore
+    }
   }, [theme])
 
-  const toggleTheme = async () => {
+  const toggleTheme = () => {
     const next: UiTheme = theme === 'dark' ? 'stoneware' : 'dark'
     setTheme(next)
-    setThemeErr(null)
-    const res = await apiSetTheme(next)
-    if (!res.ok) {
-      setThemeErr(res.error)
-      // best-effort rollback to the previous theme
-      setTheme(theme)
-      return
-    }
-    setTheme(res.value)
   }
 
   const isDark = theme === 'dark'
@@ -303,7 +298,6 @@ function App() {
           </div>
           <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} theme={theme} />
           <p className="muted chartHint">Scroll/2-finger to pan. Pinch (or ctrl+scroll) to zoom. Drag to pan.</p>
-          {themeErr ? <p className="muted">Theme save error: {themeErr}</p> : null}
         </article>
 
         <article className="card card--span2" aria-label="Recent session chart">

@@ -333,51 +333,6 @@ def v1_patch_session(session_id):
         return _json_response({"success": False, "error": "db_unavailable"}, status=503)
 
 
-@app.get('/v1/settings/theme')
-def v1_get_theme_setting():
-    """Get the persisted /app theme.
-
-    Returns {success, theme}. Theme is one of: stoneware, dark.
-    """
-
-    try:
-        from kiln_db import get_setting
-
-        db_path = _configured_sqlite_db_path()
-        theme = get_setting(db_path, key="ui_theme")
-        if theme not in ("stoneware", "dark"):
-            theme = "stoneware"
-        return _json_response({"success": True, "theme": theme})
-    except Exception:
-        log.exception("/v1/settings/theme failed")
-        return _json_response({"success": False, "error": "db_unavailable"}, status=503)
-
-
-@app.route('/v1/settings/theme', method=['PATCH'])
-def v1_patch_theme_setting():
-    """Set the persisted /app theme.
-
-    Body: {"theme": "stoneware" | "dark"}
-    """
-
-    body = bottle.request.json
-    if not isinstance(body, dict) or "theme" not in body:
-        return _json_response({"success": False, "error": "bad_request"}, status=400)
-
-    theme = body.get("theme")
-    if theme not in ("stoneware", "dark"):
-        return _json_response({"success": False, "error": "bad_request"}, status=400)
-
-    try:
-        from kiln_db import set_setting
-
-        db_path = _configured_sqlite_db_path()
-        set_setting(db_path, key="ui_theme", value=theme)
-        return _json_response({"success": True, "theme": theme})
-    except Exception:
-        log.exception("/v1/settings/theme patch failed")
-        return _json_response({"success": False, "error": "db_unavailable"}, status=503)
-
 def find_profile(wanted):
     '''
     given a wanted profile name, find it and return the parsed

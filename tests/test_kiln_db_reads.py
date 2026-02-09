@@ -14,8 +14,6 @@ from kiln_db import (
     get_session,
     list_session_samples,
     list_sessions,
-    get_setting,
-    set_setting,
     update_session_notes,
 )
 
@@ -83,19 +81,6 @@ class TestKilnDbReads(unittest.TestCase):
             sess2 = get_session(db_path, session_id=sid)
             self.assertIsNotNone(sess2)
             self.assertIsNone(sess2.get("notes"))
-
-    def test_settings_round_trip(self):
-        with tempfile.TemporaryDirectory() as td:
-            db_path = os.path.join(td, "kiln.sqlite3")
-            ensure_db(db_path)
-
-            self.assertIsNone(get_setting(db_path, key="ui_theme"))
-            set_setting(db_path, key="ui_theme", value="stoneware", updated_at=123)
-            self.assertEqual(get_setting(db_path, key="ui_theme"), "stoneware")
-
-            set_setting(db_path, key="ui_theme", value="dark", updated_at=124)
-            self.assertEqual(get_setting(db_path, key="ui_theme"), "dark")
-
 
 if __name__ == "__main__":
     unittest.main()
