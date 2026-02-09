@@ -410,6 +410,14 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/21
   - commit: 0ea35cd49b7299a063228a029af0944589143bc0
 
+- [ ] `T-0204` Live chart: start zoomed out until 30m, then lock window + pan
+  - status: IN_PROGRESS
+  - owner: @opencode
+  - deps: `T-0203`
+  - acceptance: before 30 minutes, chart stays fully zoomed out; after 30 minutes, it pans a fixed 30-minute window unless the user manually zooms/pans
+  - PR: https://github.com/canbal/kiln-controller/pull/28
+  - commit:
+
 ### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)
 
 - [x] `T-0301` Add SQLite DB file, schema versioning, and minimal migrations
