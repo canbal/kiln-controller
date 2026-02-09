@@ -364,11 +364,11 @@ Rules:
 ### Milestone 2: Read-Only Dashboard + Live Chart
 
 - [ ] `T-0201` Implement WS `/status` client with reconnect and Zod validation
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0002`, `T-0102`
   - acceptance: UI survives WS disconnect/reconnect and continues updating
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/16
   - commit:
 
 - [ ] `T-0202` Add read-only dashboard metrics (temp/target/state) optimized for small screens
