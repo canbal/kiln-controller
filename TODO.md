@@ -289,6 +289,9 @@ Options (roughly in recommended order):
    - Add numeric columns such as `temperature`, `target`, `heat`, `oven_state` alongside `state_json`.
    - Keep `state_json` for compatibility/debugging.
    - Charts and REST endpoints can read only the scalar columns to avoid JSON parsing.
+   - Optional: add a compact "resolution membership" marker for cheap downsample selection:
+     - Prefer a `res_mask INTEGER` bitmask (1s/10s/1m/10m) derived from `t` (or from a sample index) rather than separate boolean columns.
+     - Example query: `WHERE (res_mask & (1<<2)) != 0` to fetch ~1m points.
 
 2) Add a new "thin" series endpoint (keep existing endpoints stable)
    - Example: `GET /v1/sessions/:id/series?from=&to=&limit=&fields=temp,target`
