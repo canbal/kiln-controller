@@ -48,14 +48,15 @@ If you need Pi hardware deps on an actual Raspberry Pi, use `pip install -r requ
 
 If local installs still fail on macOS, use the Docker path below instead.
 
-2) For local mac dev, edit `config.py` (do not commit these local tweaks):
+2) For local mac dev, do not edit `config.py`. Use env vars:
 
-- set `listening_port = 8080` (avoids needing sudo for port 80)
+- `DEVELOPMENT=1` forces `simulate=True`
+- `PORT=8080` avoids needing sudo for port 80
 
 3) Run the server:
 
 ```bash
-source kilnenv/bin/activate && DEVELOPMENT=1 ./kiln-controller.py
+source kilnenv/bin/activate && PORT=8080 DEVELOPMENT=1 ./kiln-controller.py
 ```
 
 4) Open:

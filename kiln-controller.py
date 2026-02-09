@@ -27,11 +27,26 @@ except:
 if os.environ.get('DEVELOPMENT') == '1':
     config.simulate = True
 
+# Allow port override without editing config.py.
+# Example: PORT=8080 ./kiln-controller.py
+port_env = os.environ.get('PORT')
+port_env_invalid = False
+if port_env:
+    try:
+        config.listening_port = int(port_env)
+    except Exception:
+        port_env_invalid = True
+
 logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
 if os.environ.get('DEVELOPMENT') == '1':
     log.info("DEVELOPMENT=1 set: forcing simulate=True")
+if port_env:
+    if port_env_invalid:
+        log.warning("PORT=%s invalid; using listening_port=%s" % (port_env, config.listening_port))
+    else:
+        log.info("PORT=%s set: listening_port=%s" % (port_env, config.listening_port))
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
