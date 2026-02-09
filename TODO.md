@@ -14,6 +14,9 @@ To keep work parallelizable and reviewable, follow these conventions:
 
 - One PR should implement one Task ID (or a tight group of adjacent Task IDs).
 - Always work on a branch and use PRs; do not push directly to the default branch (`master`/`main`).
+- Update `TODO.md` as part of the PR lifecycle:
+  - when you open a PR for a task, mark it `IN_PROGRESS`, set `owner:`, and fill `PR:`
+  - when the PR is merged, mark it `DONE` and fill `commit:` with the merge SHA
 - Every PR that changes behavior should update this `TODO.md`:
   - mark the relevant Task ID(s) as DONE
   - add the merge commit SHA(s)
@@ -224,11 +227,11 @@ Rules:
 ### Milestone 0: Docs Only (Contracts + Fixtures)
 
 - [ ] `T-0001` Add `docs/contracts.md` covering `/status`, `/control`, `/storage`, `/config`, `/api`
-  - status: PLANNED
-  - owner:
+-  - status: IN_PROGRESS
+-  - owner: @opencode
   - deps:
   - acceptance: `docs/contracts.md` includes example JSON payloads and units
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/1
   - commit:
 
 - [ ] `T-0002` Add fixture JSON for `/status` backlog + steady-state messages
