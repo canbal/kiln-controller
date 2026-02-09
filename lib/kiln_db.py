@@ -258,13 +258,44 @@ def get_session(
     try:
         row = conn.execute(
             """
-            SELECT id, created_at, started_at, ended_at, profile_name, outcome
+            SELECT id, created_at, started_at, ended_at, profile_name, outcome, notes
             FROM sessions
             WHERE id = ?
             """,
             (session_id,),
         ).fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_session_notes(
+    db_path: str,
+    *,
+    session_id: str,
+    notes: Optional[str],
+) -> bool:
+    """Update a session's notes field.
+
+    Returns True if a row was updated.
+    """
+
+    conn = _connect_configured(db_path)
+    try:
+        conn.execute("BEGIN")
+        cur = conn.execute(
+            """
+            UPDATE sessions
+            SET notes = ?
+            WHERE id = ?
+            """,
+            (notes, session_id),
+        )
+        conn.execute("COMMIT")
+        return bool(cur.rowcount)
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
     finally:
         conn.close()
 

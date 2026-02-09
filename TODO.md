@@ -500,8 +500,8 @@ Rules:
 ### Milestone 6: Firing History + Notes
 
 - [ ] `T-0601` Add `/v1/sessions/:id` and `PATCH /v1/sessions/:id` for notes
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0401`
   - acceptance: notes persist across restarts
   - PR:
