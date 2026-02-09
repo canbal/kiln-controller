@@ -18,6 +18,7 @@ To keep work parallelizable and reviewable, follow these conventions:
 - Every PR must be reviewed by the human maintainer before it is merged.
   - Agents must not merge PRs on their own.
   - Wait for an explicit maintainer message containing the word "merge" for that PR before merging.
+  - Exception: bookkeeping-only PRs that *only* update `TODO.md` task status/checkboxes/PR links/merge SHAs may be merged without human review.
 - Update `TODO.md` as part of the PR lifecycle:
   - when you open a PR for a task, mark it `IN_PROGRESS`, set `owner:`, and fill `PR:`
   - when the PR is merged, mark it `DONE` and fill `commit:` with the merge SHA
@@ -352,13 +353,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/10
   - commit: 01ff6267bb41e54a50dabeb9887334e64048d9c8
 
-- [ ] `T-0102` Create `frontend/` React+TS+Vite skeleton and produce committed build output in `public/app/`
-  - status: IN_PROGRESS
+- [x] `T-0102` Create `frontend/` React+TS+Vite skeleton and produce committed build output in `public/app/`
+  - status: DONE
   - owner: @opencode
   - deps: `T-0101`
   - acceptance: repo can be pulled on kiln and restarted without extra build steps
   - PR: https://github.com/canbal/kiln-controller/pull/12
-  - commit:
+  - commit: a2a041d4d921c4e8400b8ccbd9f0402af839379f
 
 ### Milestone 2: Read-Only Dashboard + Live Chart
 
