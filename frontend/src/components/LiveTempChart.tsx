@@ -22,6 +22,15 @@ type LiveTempChartProps = {
   tempScale: 'f' | 'c' | null
 }
 
+function fmtTemp(v: number): string {
+  // Keep labels stable but allow sub-degree resolution.
+  if (!Number.isFinite(v)) return '--'
+  const rounded = Math.round(v)
+  if (Math.abs(v - rounded) < 0.05) return String(rounded)
+  const s = v.toFixed(1)
+  return s.endsWith('.0') ? s.slice(0, -2) : s
+}
+
 function clampHistory(points: Point[], maxPoints: number): void {
   if (points.length <= maxPoints) return
   points.splice(0, points.length - maxPoints)
@@ -75,6 +84,9 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
   const unitRef = useRef(unit)
 
+  const lastAppliedYRef = useRef<{ min: number; max: number } | null>(null)
+  const yAutorangeRafRef = useRef<number | null>(null)
+
   useEffect(() => {
     unitRef.current = unit
   }, [unit])
@@ -86,6 +98,70 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const max = pts[pts.length - 1][0]
     if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null
     return { min, max }
+  }
+
+  const computeVisibleYRange = (chart: EChartsType): { min: number; max: number } | null => {
+    const win = readZoomWindowValues(chart)
+    if (!win) return null
+
+    let minY = Number.POSITIVE_INFINITY
+    let maxY = Number.NEGATIVE_INFINITY
+
+    const scan = (pts: Point[]) => {
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i]
+        const t = p[0]
+        const y = p[1]
+        if (t < win.startValue || t > win.endValue) continue
+        if (y === null) continue
+        if (!Number.isFinite(y)) continue
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
+
+    scan(actualRef.current)
+    scan(targetRef.current)
+
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return null
+
+    let span = maxY - minY
+    if (!(span > 0)) span = 1
+    const pad = Math.max(1, span * 0.08)
+    const min = Math.max(0, minY - pad)
+    const max = maxY + pad
+
+    // Avoid zero-span axis.
+    if (max - min < 2) {
+      const mid = (max + min) / 2
+      return { min: Math.max(0, mid - 1), max: mid + 1 }
+    }
+    return { min, max }
+  }
+
+  const scheduleYAxisAutorange = (chart: EChartsType) => {
+    if (yAutorangeRafRef.current !== null) return
+    yAutorangeRafRef.current = window.requestAnimationFrame(() => {
+      yAutorangeRafRef.current = null
+      const next = computeVisibleYRange(chart)
+      if (!next) return
+
+      const prev = lastAppliedYRef.current
+      const changed =
+        !prev || Math.abs(prev.min - next.min) > 0.25 || Math.abs(prev.max - next.max) > 0.25
+      if (!changed) return
+      lastAppliedYRef.current = next
+
+      chart.setOption(
+        {
+          yAxis: {
+            min: next.min,
+            max: next.max,
+          },
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+    })
   }
 
   const readZoomWindowPct = (chart: EChartsType): { startPct: number; endPct: number } | null => {
@@ -367,11 +443,21 @@ export function LiveTempChart(props: LiveTempChartProps) {
         textStyle: { color: 'rgba(255,255,255,0.92)' },
         valueFormatter: (v: unknown) => {
           const u = unitRef.current
-          return typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v)}°${u}` : '--'
+          return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
         },
       },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none', start: 80, end: 100 },
+        {
+          type: 'inside',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          start: 80,
+          end: 100,
+          // Trackpad/two-finger scroll should pan, not zoom.
+          // Allow zoom via pinch gesture (typically emits ctrl+wheel) or ctrl+wheel.
+          zoomOnMouseWheel: 'ctrl',
+          moveOnMouseWheel: true,
+        },
         {
           type: 'slider',
           xAxisIndex: 0,
@@ -384,6 +470,9 @@ export function LiveTempChart(props: LiveTempChartProps) {
           fillerColor: 'rgba(240, 176, 74, 0.20)',
           handleStyle: { color: 'rgba(240, 176, 74, 0.65)', borderColor: 'rgba(240, 176, 74, 0.35)' },
           textStyle: { color: 'rgba(255,255,255,0.70)' },
+          // Keep mousewheel pan behavior consistent with the inside zoom.
+          zoomOnMouseWheel: 'ctrl',
+          moveOnMouseWheel: true,
         },
       ],
       xAxis: {
@@ -401,11 +490,14 @@ export function LiveTempChart(props: LiveTempChartProps) {
       yAxis: {
         type: 'value',
         boundaryGap: ['10%', '10%'],
+        // Never show sub-0.5 degree tick steps (requirement is phrased in F, but
+        // using the same minimum keeps the axis legible in both scales).
+        minInterval: 0.5,
         axisLabel: {
           color: 'rgba(255,255,255,0.70)',
           formatter: (v: number) => {
             const u = unitRef.current
-            return Number.isFinite(v) ? `${Math.round(v)}°${u}` : '--'
+            return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
           },
         },
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.16)' } },
@@ -446,6 +538,11 @@ export function LiveTempChart(props: LiveTempChartProps) {
     chart.setOption(baseOption, { notMerge: true })
 
     const onDataZoom = () => {
+      // Always fit the y-axis to the currently visible x-window, even for
+      // programmatic zoom changes (Reset/auto live window).
+      scheduleYAxisAutorange(chart)
+
+      // For programmatic zoom changes, skip the follow/lock behavior.
       if (programmaticZoomRef.current) return
 
       // Enforce a minimum zoom span (prevents zooming in too far).
@@ -537,6 +634,10 @@ export function LiveTempChart(props: LiveTempChartProps) {
       ro.disconnect()
       chart.off('dataZoom', onDataZoom)
       chartRef.current = null
+      if (yAutorangeRafRef.current !== null) {
+        window.cancelAnimationFrame(yAutorangeRafRef.current)
+        yAutorangeRafRef.current = null
+      }
       chart.dispose()
     }
   }, [baseOption])
@@ -576,6 +677,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
       { notMerge: false, lazyUpdate: true },
     )
 
+    scheduleYAxisAutorange(chartRef.current)
+
     // Start in the correct zoom state immediately after seeding.
     if (followLiveRef.current && autoLiveWindowRef.current) {
       applyAutoLiveWindow(chartRef.current)
@@ -604,6 +707,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
       },
       { notMerge: false, lazyUpdate: true },
     )
+
+    scheduleYAxisAutorange(chart)
 
     if (followLiveRef.current) {
       if (autoLiveWindowRef.current) {
