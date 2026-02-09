@@ -352,13 +352,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/10
   - commit: 01ff6267bb41e54a50dabeb9887334e64048d9c8
 
-- [ ] `T-0102` Create `frontend/` React+TS+Vite skeleton and produce committed build output in `public/app/`
-  - status: IN_PROGRESS
+- [x] `T-0102` Create `frontend/` React+TS+Vite skeleton and produce committed build output in `public/app/`
+  - status: DONE
   - owner: @opencode
   - deps: `T-0101`
   - acceptance: repo can be pulled on kiln and restarted without extra build steps
   - PR: https://github.com/canbal/kiln-controller/pull/12
-  - commit:
+  - commit: a2a041d4d921c4e8400b8ccbd9f0402af839379f
 
 ### Milestone 2: Read-Only Dashboard + Live Chart
 
