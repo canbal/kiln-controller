@@ -49,6 +49,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const followLiveRef = useRef(true)
   const programmaticZoomRef = useRef(false)
   const zoomSpanPctRef = useRef(20)
+  const lockedRangeRef = useRef<{ startValue: number; endValue: number } | null>(null)
 
   const seededRef = useRef(false)
   const lastPointAtRef = useRef<number | null>(null)
@@ -57,6 +58,15 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
   const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
 
+  const timeExtent = () => {
+    const pts = actualRef.current
+    if (pts.length < 2) return null
+    const min = pts[0][0]
+    const max = pts[pts.length - 1][0]
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null
+    return { min, max }
+  }
+
   const resetToLive = () => {
     const chart = chartRef.current
     followLiveRef.current = true
@@ -64,6 +74,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
     if (!chart) return
 
     zoomSpanPctRef.current = 20
+    lockedRangeRef.current = null
     programmaticZoomRef.current = true
     chart.dispatchAction({ type: 'dataZoom', start: 80, end: 100 })
     window.setTimeout(() => {
@@ -166,6 +177,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
       // When zoomed/panned but still at the live edge, preserve the zoom level.
       if (end >= 99.5) {
         zoomSpanPctRef.current = span
+        lockedRangeRef.current = null
         if (!followLiveRef.current) {
           followLiveRef.current = true
           setFollowLive(true)
@@ -175,6 +187,28 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
       followLiveRef.current = false
       setFollowLive(false)
+
+      // Lock to absolute time range so the window doesn't drift as new samples extend the axis.
+      const extent = timeExtent()
+      if (!extent) return
+      const toValue = (pct: number) => extent.min + ((extent.max - extent.min) * pct) / 100
+      const startValue = toValue(start)
+      const endValue = toValue(end)
+      lockedRangeRef.current = { startValue, endValue }
+
+      programmaticZoomRef.current = true
+      chart.setOption(
+        {
+          dataZoom: [
+            { rangeMode: ['value', 'value'], startValue, endValue },
+            { rangeMode: ['value', 'value'], startValue, endValue },
+          ],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+      window.setTimeout(() => {
+        programmaticZoomRef.current = false
+      }, 0)
     }
 
     chart.on('dataZoom', onDataZoom)
@@ -268,6 +302,24 @@ export function LiveTempChart(props: LiveTempChartProps) {
       window.setTimeout(() => {
         programmaticZoomRef.current = false
       }, 0)
+    } else {
+      // Re-apply locked absolute range after data updates.
+      const locked = lockedRangeRef.current
+      if (locked) {
+        programmaticZoomRef.current = true
+        chart.setOption(
+          {
+            dataZoom: [
+              { rangeMode: ['value', 'value'], startValue: locked.startValue, endValue: locked.endValue },
+              { rangeMode: ['value', 'value'], startValue: locked.startValue, endValue: locked.endValue },
+            ],
+          },
+          { notMerge: false, lazyUpdate: true },
+        )
+        window.setTimeout(() => {
+          programmaticZoomRef.current = false
+        }, 0)
+      }
     }
   }, [props.state, maxPoints])
 
