@@ -69,6 +69,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
   const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
   const LIVE_WINDOW_MS = 30 * 60 * 1000
+  const MIN_ZOOM_MS = 10 * 1000
 
   const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
   const unitRef = useRef(unit)
@@ -132,6 +133,26 @@ export function LiveTempChart(props: LiveTempChartProps) {
     return span > 0 ? span : null
   }
 
+  const readZoomWindowValues = (chart: EChartsType): { startValue: number; endValue: number } | null => {
+    const opt = chart.getOption()
+    const zoom0 = Array.isArray(opt.dataZoom) ? (opt.dataZoom[0] as Record<string, unknown> | undefined) : undefined
+    if (!zoom0) return null
+
+    const startValue = typeof zoom0.startValue === 'number' ? zoom0.startValue : null
+    const endValue = typeof zoom0.endValue === 'number' ? zoom0.endValue : null
+    if (startValue !== null && endValue !== null) {
+      return { startValue, endValue }
+    }
+
+    const start = typeof zoom0.start === 'number' ? zoom0.start : null
+    const end = typeof zoom0.end === 'number' ? zoom0.end : null
+    const extent = timeExtent()
+    if (!extent || start === null || end === null) return null
+
+    const toValue = (pct: number) => extent.min + ((extent.max - extent.min) * pct) / 100
+    return { startValue: toValue(start), endValue: toValue(end) }
+  }
+
   const formatSpan = (ms: number): string => {
     const s = ms / 1000
     if (s >= 3600) {
@@ -158,6 +179,72 @@ export function LiveTempChart(props: LiveTempChartProps) {
       zoomSpanHideTimerRef.current = null
       setZoomSpanLabel(null)
     }, 900)
+  }
+
+  const clampMinZoomSpanIfNeeded = (chart: EChartsType): boolean => {
+    const extent = timeExtent()
+    if (!extent) return false
+    const fullSpan = extent.max - extent.min
+    if (fullSpan <= 0) return false
+
+    const win = readZoomWindowValues(chart)
+    if (!win) return false
+
+    const span = win.endValue - win.startValue
+    if (!(span > 0) || span >= MIN_ZOOM_MS) return false
+
+    // If we don't have enough data to support the minimum span, show full extent.
+    if (fullSpan < MIN_ZOOM_MS) {
+      programmaticZoomRef.current = true
+      chart.setOption(
+        {
+          dataZoom: [
+            { rangeMode: ['percent', 'percent'], start: 0, end: 100 },
+            { rangeMode: ['percent', 'percent'], start: 0, end: 100 },
+          ],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+      window.setTimeout(() => {
+        programmaticZoomRef.current = false
+      }, 0)
+      setZoomSpanLabel(formatSpan(fullSpan))
+      return true
+    }
+
+    const center = (win.startValue + win.endValue) / 2
+    let startValue = center - MIN_ZOOM_MS / 2
+    let endValue = center + MIN_ZOOM_MS / 2
+
+    if (startValue < extent.min) {
+      const d = extent.min - startValue
+      startValue += d
+      endValue += d
+    }
+    if (endValue > extent.max) {
+      const d = endValue - extent.max
+      startValue -= d
+      endValue -= d
+    }
+
+    startValue = Math.max(extent.min, startValue)
+    endValue = Math.min(extent.max, endValue)
+
+    programmaticZoomRef.current = true
+    chart.setOption(
+      {
+        dataZoom: [
+          { rangeMode: ['value', 'value'], startValue, endValue },
+          { rangeMode: ['value', 'value'], startValue, endValue },
+        ],
+      },
+      { notMerge: false, lazyUpdate: true },
+    )
+    window.setTimeout(() => {
+      programmaticZoomRef.current = false
+    }, 0)
+    setZoomSpanLabel(formatSpan(endValue - startValue))
+    return true
   }
 
   const resetToLive = () => {
@@ -345,6 +432,22 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     const onDataZoom = () => {
       if (programmaticZoomRef.current) return
+
+      // Enforce a minimum zoom span (prevents zooming in too far).
+      if (clampMinZoomSpanIfNeeded(chart)) {
+        // Still treat this as manual interaction, but skip the follow/lock logic for this tick.
+        autoLiveWindowRef.current = false
+        setAutoLiveWindow(false)
+
+        if (zoomSpanHideTimerRef.current !== null) {
+          window.clearTimeout(zoomSpanHideTimerRef.current)
+        }
+        zoomSpanHideTimerRef.current = window.setTimeout(() => {
+          zoomSpanHideTimerRef.current = null
+          setZoomSpanLabel(null)
+        }, 900)
+        return
+      }
 
       showZoomSpanHint(chart)
 
