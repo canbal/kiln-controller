@@ -6,7 +6,12 @@ import logging
 import json
 import config
 import os
-import tm1637
+try:
+    import tm1637
+except Exception:
+    # Allow simulate-mode to run on non-Raspberry Pi machines where the LCD
+    # library (and its GPIO deps) may not be available.
+    tm1637 = None
 
 log = logging.getLogger(__name__)
 
@@ -219,10 +224,25 @@ class Oven(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         self.time_step = config.sensor_time_wait
-        self.lcd = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
-        self.lcd2 = tm1637.TM1637(clk=config.gpio_lcd2_clk, dio=config.gpio_lcd2_dio)
-        self.lcd.write([0,0,0,0])
-        self.lcd2.write([0,0,0,0])
+
+        if tm1637 is None:
+            class _NoopLCD:
+                def __init__(self, *args, **kwargs):
+                    pass
+
+                def write(self, *args, **kwargs):
+                    pass
+
+                def number(self, *args, **kwargs):
+                    pass
+
+            self.lcd = _NoopLCD()
+            self.lcd2 = _NoopLCD()
+        else:
+            self.lcd = tm1637.TM1637(clk=config.gpio_lcd_clk, dio=config.gpio_lcd_dio)
+            self.lcd2 = tm1637.TM1637(clk=config.gpio_lcd2_clk, dio=config.gpio_lcd2_dio)
+            self.lcd.write([0,0,0,0])
+            self.lcd2.write([0,0,0,0])
         self.reset()
 
     def reset(self):

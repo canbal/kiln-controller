@@ -1,0 +1,6 @@
+setuptools
+greenlet
+bottle
+gevent
+gevent-websocket
+websocket-client

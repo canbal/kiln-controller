@@ -1,8 +1,12 @@
 import logging
 import os
 
-# uncomment this if using MAX-31856
-from lib.max31856 import MAX31856
+try:
+    # MAX-31856 support. This import pulls in Pi-oriented GPIO deps.
+    # Keep it best-effort so simulate-mode can run on non-Pi dev machines.
+    from lib.max31856 import MAX31856
+except Exception:
+    MAX31856 = None
 
 ########################################################################
 #
@@ -44,8 +48,10 @@ gpio_heat = 23  # Switches zero-cross solid-state-relay
 max31855 = 0
 max31856 = 1
 # see lib/max31856.py for other thermocouple_type, only applies to max31856
-# uncomment this if using MAX-31856
-thermocouple_type = MAX31856.MAX31856_K_TYPE
+if MAX31856 is not None:
+    thermocouple_type = MAX31856.MAX31856_K_TYPE
+else:
+    thermocouple_type = None
 
 ### Thermocouple Connection (using bitbang interfaces)
 gpio_sensor_cs = 27
@@ -205,4 +211,3 @@ automatic_restart_state_file = os.path.abspath(os.path.join(os.path.dirname( __f
 # See https://github.com/jbruce12000/kiln-profiles
 kiln_profiles_directory = os.path.abspath(os.path.join(os.path.dirname( __file__ ),"storage", "profiles")) 
 #kiln_profiles_directory = os.path.abspath(os.path.join(os.path.dirname( __file__ ),'..','kiln-profiles','pottery')) 
-

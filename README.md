@@ -97,6 +97,35 @@ You may want to change the configuration parameter **sensor_time_wait**. It's th
 
     $ source venv/bin/activate; ./kiln-controller.py
 
+### Local Development (simulate mode)
+
+If you want to visually test the web UI locally (macOS/Linux) without Raspberry Pi hardware, run in simulation mode.
+
+1) Create a virtualenv and install local-only deps:
+
+    $ python3 -m venv venv
+    $ source venv/bin/activate
+    $ pip install -r requirements-local.txt
+
+2) In `config.py` set:
+
+    simulate = True
+    listening_port = 8080
+
+3) Start the server:
+
+    $ source venv/bin/activate; ./kiln-controller.py
+
+4) Open in a browser:
+
+- Legacy UI: http://localhost:8080/picoreflow/index.html
+- New UI placeholder: http://localhost:8080/app
+
+Notes:
+
+- Port `80` requires elevated privileges on most machines; use `8080` locally.
+- Do not commit local-only `config.py` tweaks. You can discard changes with `git checkout -- config.py`.
+
 ### Autostart Server onBoot
 If you want the server to autostart on boot, run the following command:
 
@@ -104,8 +133,10 @@ If you want the server to autostart on boot, run the following command:
 
 ### Client Access
 
-Click http://127.0.0.1:8081 for local development or the IP
-of your PI and the port defined in config.py (default 8081).
+Open the server at the IP/port configured by `listening_port` in `config.py`.
+For example, if you set `listening_port = 8080` for local dev, use:
+
+    http://127.0.0.1:8080/picoreflow/index.html
 
 ### Simulation
 
