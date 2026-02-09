@@ -2,6 +2,7 @@ import './App.css'
 import { useStatusWs } from './ws/status'
 import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
+import { RecentSessionChart } from './components/RecentSessionChart'
 
 function formatTime(d: Date | null): string {
   if (!d) return 'never'
@@ -234,6 +235,14 @@ function App() {
           </div>
           <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} />
           <p className="muted chartHint">Pinch/scroll to zoom. Drag to pan.</p>
+        </article>
+
+        <article className="card card--span2" aria-label="Recent session chart">
+          <div className="cardHead">
+            <h2>Most Recent Session</h2>
+            <div className="cardHeadMeta muted">Cooling tail + end marker</div>
+          </div>
+          <RecentSessionChart tempScale={cfg.tempScale} />
         </article>
 
         <article className="card">

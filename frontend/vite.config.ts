@@ -17,6 +17,8 @@ export default defineConfig({
       '/storage': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
       '/config': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
       '/api': { target: 'http://localhost:8080', changeOrigin: true },
+      // Additive REST endpoints for the modern UI.
+      '/v1': { target: 'http://localhost:8080', changeOrigin: true },
       '/picoreflow': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
