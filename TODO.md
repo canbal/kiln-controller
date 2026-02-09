@@ -250,7 +250,7 @@ Rules:
   - owner: @opencode
   - deps: `T-0001`
   - acceptance: fixture exists and matches current server output shape
-  - PR:
+  - PR: https://github.com/canbal/kiln-controller/pull/7
   - commit:
 
 ### Milestone 1: New UI Shell (Complementary, Read-Only)
