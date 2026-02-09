@@ -34,6 +34,11 @@ function notePreview(notes: unknown): string | null {
   return oneLine.length > 120 ? `${oneLine.slice(0, 117)}...` : oneLine
 }
 
+function hasOwn(obj: unknown, key: string): boolean {
+  if (!obj || typeof obj !== 'object') return false
+  return Object.prototype.hasOwnProperty.call(obj, key)
+}
+
 export function SessionsListPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,29 +47,37 @@ export function SessionsListPage() {
 
   useEffect(() => {
     const ac = new AbortController()
+    let cancelled = false
 
     const run = async () => {
       setLoading(true)
       setError(null)
       const res = await apiListSessions({ limit: 100, offset: 0, signal: ac.signal })
       if (!res.ok) {
+        if (cancelled || res.error === 'aborted') return
         setError(res.error)
         setSessions([])
         setLoading(false)
         return
       }
+      if (cancelled) return
       setSessions(res.value)
       setLoading(false)
     }
 
     run().catch((e) => {
-      if (String(e).includes('AbortError')) return
+      if (cancelled) return
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg === 'aborted' || msg.toLowerCase().includes('signal is aborted') || msg.includes('AbortError')) return
       setError(e instanceof Error ? e.message : String(e))
       setSessions([])
       setLoading(false)
     })
 
-    return () => ac.abort()
+    return () => {
+      cancelled = true
+      ac.abort()
+    }
   }, [refreshToken])
 
   const rows = useMemo(() => {
@@ -91,7 +104,9 @@ export function SessionsListPage() {
       <div className="sessionList" role="list">
         {rows.map((s) => {
           const dur = computeDurationS(s)
-          const notes = notePreview((s as Record<string, unknown>).notes)
+          const sObj = s as unknown
+          const notesKeyPresent = hasOwn(sObj, 'notes')
+          const notes = notePreview(notesKeyPresent ? (s as Record<string, unknown>).notes : undefined)
           const outcome = typeof s.outcome === 'string' && s.outcome ? s.outcome : '--'
           const when = typeof s.started_at === 'number' ? s.started_at : s.created_at
           return (
@@ -111,7 +126,13 @@ export function SessionsListPage() {
               </div>
               <div className="sessionRowBottom">
                 <div className="sessionMeta muted">Duration: {fmtDurationSec(dur)}</div>
-                {notes ? <div className="sessionNotes">{notes}</div> : <div className="sessionNotes sessionNotes--empty">No notes</div>}
+                {notes ? (
+                  <div className="sessionNotes">{notes}</div>
+                ) : notesKeyPresent ? (
+                  <div className="sessionNotes sessionNotes--empty">No notes</div>
+                ) : (
+                  <div className="sessionNotes sessionNotes--empty">Open to view/edit notes</div>
+                )}
               </div>
             </a>
           )

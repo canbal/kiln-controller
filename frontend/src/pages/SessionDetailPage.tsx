@@ -51,6 +51,7 @@ export function SessionDetailPage(props: { sessionId: string }) {
 
   useEffect(() => {
     const ac = new AbortController()
+    let cancelled = false
 
     const run = async () => {
       setLoading(true)
@@ -60,12 +61,14 @@ export function SessionDetailPage(props: { sessionId: string }) {
 
       const res = await apiGetSession({ sessionId, signal: ac.signal })
       if (!res.ok) {
+        if (cancelled || res.error === 'aborted') return
         setError(res.error)
         setSession(null)
         setLoading(false)
         return
       }
 
+      if (cancelled) return
       setSession(res.value)
       const notes = (res.value as Record<string, unknown>).notes
       const notesStr = typeof notes === 'string' ? notes : null
@@ -75,13 +78,18 @@ export function SessionDetailPage(props: { sessionId: string }) {
     }
 
     run().catch((e) => {
-      if (String(e).includes('AbortError')) return
+      if (cancelled) return
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg === 'aborted' || msg.toLowerCase().includes('signal is aborted') || msg.includes('AbortError')) return
       setError(e instanceof Error ? e.message : String(e))
       setSession(null)
       setLoading(false)
     })
 
-    return () => ac.abort()
+    return () => {
+      cancelled = true
+      ac.abort()
+    }
   }, [sessionId])
 
   const maxLen = 5000

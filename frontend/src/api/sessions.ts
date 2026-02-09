@@ -9,7 +9,19 @@ import type { Session, SessionSample } from '../contract/sessions'
 type ApiOk<T> = { ok: true; value: T }
 type ApiErr = { ok: false; error: string }
 
+function isAbortError(e: unknown): boolean {
+  // Browsers differ:
+  // - DOMException name === 'AbortError'
+  // - message like "signal is aborted without reason"
+  if (typeof e !== 'object' || e === null) return false
+  const maybe = e as { name?: unknown; message?: unknown }
+  if (maybe.name === 'AbortError') return true
+  if (typeof maybe.message === 'string' && maybe.message.toLowerCase().includes('signal is aborted')) return true
+  return false
+}
+
 function errMsg(e: unknown): string {
+  if (isAbortError(e)) return 'aborted'
   if (e instanceof Error) return e.message
   return String(e)
 }
