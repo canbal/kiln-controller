@@ -137,6 +137,13 @@
     0 12px 28px rgba(58, 40, 27, 0.08);
 }
 
+:root[data-theme='stoneware'] .card {
+  /* Add a subtle darker rim at the top edge to match the dark theme's depth. */
+  box-shadow:
+    0 1px 0 rgba(70, 55, 44, 0.22) inset,
+    0 12px 28px rgba(58, 40, 27, 0.08);
+}
+
 .card h2 {
   margin: 0 0 8px;
   font-size: 14px;
