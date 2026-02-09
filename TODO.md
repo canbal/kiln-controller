@@ -24,8 +24,31 @@ To keep work parallelizable and reviewable, follow these conventions:
   - when the PR is merged, mark it `DONE` and fill `commit:` with the merge SHA
   - when a task is `DONE`, also check its box (`- [x]`)
 - Handoff expectation: after completing a task (typically after the bookkeeping PR merges), include a copy/paste prompt for the next agent.
-  - The maintainer will often clear chat context and start a new session; the handoff prompt should be self-contained and point to the next Task ID.
-  - Also copy the handoff prompt to the clipboard on macOS by executing `pbcopy` in the repo shell (so the maintainer only needs to paste into the new chat).
+- The maintainer will often clear chat context and start a new session; the handoff prompt should be self-contained and point to the next Task ID.
+- Also copy the handoff prompt to the clipboard on macOS by executing `pbcopy` in the repo shell (so the maintainer only needs to paste into the new chat).
+
+### End-of-Session Handoff (Required)
+
+At the end of *every* task session (feature PR merged + bookkeeping PR merged), the agent must end the chat with a paste-able handoff instruction for the next agent.
+
+Rules:
+
+- The final assistant message must include a section titled `Next Agent Handoff` containing a single fenced code block that can be copy/pasted into a new chat.
+- The handoff prompt must be self-contained (assume the next agent has zero context).
+- The handoff prompt must include:
+  - which Task ID to pick next (or "stop" if no next task)
+  - what branch/PRs were created/merged in the just-finished task
+  - the merge SHA(s)
+  - any follow-ups, caveats, or local verification steps
+- On macOS, copy the handoff prompt to the clipboard by running:
+  - `pbcopy < /tmp/next-agent-handoff.txt` (preferred), OR
+  - `printf '%s' "..." | pbcopy` (avoid if long)
+
+Suggested workflow for clipboard:
+
+1) Write the handoff text to `/tmp/next-agent-handoff.txt` (using a heredoc in the repo shell).
+2) Run `pbcopy < /tmp/next-agent-handoff.txt`.
+3) Paste the same content in the final assistant message.
 - Every PR that changes behavior should update this `TODO.md`:
   - mark the relevant Task ID(s) as DONE
   - add the merge commit SHA(s)
