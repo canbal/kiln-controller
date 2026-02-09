@@ -15,6 +15,15 @@ npm install
 npm run dev
 ```
 
+Recommended: also run the Python server on `:8080` (separate terminal), so Vite can proxy legacy
+WS/HTTP endpoints:
+
+```bash
+source kilnenv/bin/activate && PORT=8080 DEVELOPMENT=1 ./kiln-controller.py
+```
+
+Then open the Vite URL it prints (it should auto-open at `/app/`).
+
 ## Build (commits output into `public/app/`)
 
 ```bash
