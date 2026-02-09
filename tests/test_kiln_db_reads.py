@@ -14,6 +14,7 @@ from kiln_db import (
     get_session,
     list_session_samples,
     list_sessions,
+    update_session_notes,
 )
 
 
@@ -61,6 +62,25 @@ class TestKilnDbReads(unittest.TestCase):
 
             limited = list_session_samples(db_path, session_id=sid, limit=2)
             self.assertEqual([s["t"] for s in limited], [1000, 1010])
+
+    def test_update_session_notes_round_trip(self):
+        with tempfile.TemporaryDirectory() as td:
+            db_path = os.path.join(td, "kiln.sqlite3")
+            ensure_db(db_path)
+
+            sid = create_session(db_path, profile_name="p1", created_at=100, started_at=100)
+            ok = update_session_notes(db_path, session_id=sid, notes="hello")
+            self.assertTrue(ok)
+
+            sess = get_session(db_path, session_id=sid)
+            self.assertIsNotNone(sess)
+            self.assertEqual(sess.get("notes"), "hello")
+
+            ok2 = update_session_notes(db_path, session_id=sid, notes=None)
+            self.assertTrue(ok2)
+            sess2 = get_session(db_path, session_id=sid)
+            self.assertIsNotNone(sess2)
+            self.assertIsNone(sess2.get("notes"))
 
 
 if __name__ == "__main__":

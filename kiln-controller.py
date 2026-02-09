@@ -281,6 +281,57 @@ def v1_list_session_samples(session_id):
         log.exception("/v1/sessions/%s/samples failed" % session_id)
         return _json_response({"success": False, "error": "db_unavailable"}, status=503)
 
+
+@app.get('/v1/sessions/<session_id>')
+def v1_get_session(session_id):
+    """Fetch a single session (includes notes)."""
+
+    try:
+        from kiln_db import get_session
+
+        db_path = _configured_sqlite_db_path()
+        sess = get_session(db_path, session_id=session_id)
+        if not sess:
+            return _json_response({"success": False, "error": "not_found"}, status=404)
+        return _json_response({"success": True, "session_id": session_id, "session": sess})
+    except Exception:
+        log.exception("/v1/sessions/%s failed" % session_id)
+        return _json_response({"success": False, "error": "db_unavailable"}, status=503)
+
+
+@app.route('/v1/sessions/<session_id>', method=['PATCH'])
+def v1_patch_session(session_id):
+    """Update a session (currently: notes only)."""
+
+    body = bottle.request.json
+    if not isinstance(body, dict) or "notes" not in body:
+        return _json_response({"success": False, "error": "bad_request"}, status=400)
+
+    notes = body.get("notes")
+    if notes is None:
+        notes_str = None
+    elif isinstance(notes, str):
+        # Keep payloads small and stable.
+        if len(notes) > 5000:
+            return _json_response({"success": False, "error": "notes_too_large"}, status=400)
+        notes_str = notes
+    else:
+        return _json_response({"success": False, "error": "bad_request"}, status=400)
+
+    try:
+        from kiln_db import get_session, update_session_notes
+
+        db_path = _configured_sqlite_db_path()
+        updated = update_session_notes(db_path, session_id=session_id, notes=notes_str)
+        if not updated:
+            return _json_response({"success": False, "error": "not_found"}, status=404)
+
+        sess = get_session(db_path, session_id=session_id)
+        return _json_response({"success": True, "session_id": session_id, "session": sess})
+    except Exception:
+        log.exception("/v1/sessions/%s patch failed" % session_id)
+        return _json_response({"success": False, "error": "db_unavailable"}, status=503)
+
 def find_profile(wanted):
     '''
     given a wanted profile name, find it and return the parsed
