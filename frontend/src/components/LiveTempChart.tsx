@@ -118,7 +118,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const baseOption = useMemo(
     () => ({
       animation: false,
-      grid: { left: 40, right: 14, top: 20, bottom: 42 },
+      grid: { left: 44, right: 14, top: 34, bottom: 54 },
       legend: {
         top: 0,
         left: 0,
@@ -161,6 +161,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
       },
       yAxis: {
         type: 'value',
+        boundaryGap: ['10%', '10%'],
         axisLabel: {
           color: 'rgba(255,255,255,0.70)',
           formatter: (v: number) => {
