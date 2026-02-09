@@ -326,3 +326,5 @@ Purpose: fetch PID stats (when available).
 
 Response body: the `pidstats` object (see `/status` examples). When not available,
 the server may return an empty response.
+
+Fixture (when available): `docs/fixtures/api_stats.json`
