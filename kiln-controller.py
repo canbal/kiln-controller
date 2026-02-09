@@ -22,9 +22,16 @@ except:
     print ("Copy config.py.EXAMPLE to config.py and adapt it for your setup.")
     exit(1)
 
+# Development mode: allow local testing without editing config.py.
+# Set DEVELOPMENT=1 to force simulation mode (no GPIO / thermocouple access).
+if os.environ.get('DEVELOPMENT') == '1':
+    config.simulate = True
+
 logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
+if os.environ.get('DEVELOPMENT') == '1':
+    log.info("DEVELOPMENT=1 set: forcing simulate=True")
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')

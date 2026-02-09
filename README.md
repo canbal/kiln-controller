@@ -123,12 +123,11 @@ If you're on a Raspberry Pi and want real hardware support, use `requirements.tx
 
 2) In `config.py` set:
 
-    simulate = True
     listening_port = 8080
 
 3) Start the server:
 
-    $ source venv/bin/activate; ./kiln-controller.py
+    $ source venv/bin/activate; DEVELOPMENT=1 ./kiln-controller.py
 
 4) Open in a browser:
 

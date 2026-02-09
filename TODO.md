@@ -50,13 +50,12 @@ If local installs still fail on macOS, use the Docker path below instead.
 
 2) For local mac dev, edit `config.py` (do not commit these local tweaks):
 
-- set `simulate = True` (prevents Raspberry Pi GPIO / thermocouple access)
 - set `listening_port = 8080` (avoids needing sudo for port 80)
 
 3) Run the server:
 
 ```bash
-source venv/bin/activate && ./kiln-controller.py
+source venv/bin/activate && DEVELOPMENT=1 ./kiln-controller.py
 ```
 
 4) Open:
