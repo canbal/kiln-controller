@@ -418,6 +418,14 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/28
   - commit: ae2ac95a29f440dc6e08571c20da66059e43087d
 
+- [ ] `T-0205` New UI: show progress %, elapsed, and ETA (remaining)
+  - status: IN_PROGRESS
+  - owner: @opencode
+  - deps: `T-0202`
+  - acceptance: `/app` shows progress %, elapsed time, and estimated time remaining when RUNNING
+  - PR:
+  - commit:
+
 ### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)
 
 - [x] `T-0301` Add SQLite DB file, schema versioning, and minimal migrations
