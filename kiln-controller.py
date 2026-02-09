@@ -49,6 +49,25 @@ oven.set_ovenwatcher(ovenWatcher)
 def index():
     return bottle.redirect('/picoreflow/index.html')
 
+
+@app.route('/app')
+@app.route('/app/')
+def app_index():
+    # Additive: new UI shell lives under public/app/. Legacy /picoreflow is unchanged.
+    return bottle.static_file(
+        'index.html',
+        root=os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'public/app'),
+    )
+
+
+@app.route('/app/:filename#.*#')
+def send_app_static(filename):
+    log.debug("serving /app/%s" % filename)
+    return bottle.static_file(
+        filename,
+        root=os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'public/app'),
+    )
+
 @app.get('/api/stats')
 def handle_api():
     log.info("/api/stats command received")
