@@ -30,6 +30,8 @@ run profile (if available).
 
 Example:
 
+Fixture: `docs/fixtures/status_backlog.json`
+
 ```json
 {
   "type": "backlog",
@@ -83,6 +85,11 @@ After connect, the watcher thread broadcasts `Oven.get_state()` once per control
 loop. This message is *not* wrapped; it is a plain JSON object.
 
 Example:
+
+Fixtures:
+
+- `docs/fixtures/status_state_running.json`
+- `docs/fixtures/status_state_idle.json`
 
 ```json
 {

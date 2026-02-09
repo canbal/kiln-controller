@@ -238,8 +238,8 @@ Rules:
   - commit: a2126dd94ea50cf10c67f8036c66dbfc4575d6aa
 
 - [ ] `T-0002` Add fixture JSON for `/status` backlog + steady-state messages
-  - status: PLANNED
-  - owner:
+  - status: IN_PROGRESS
+  - owner: @opencode
   - deps: `T-0001`
   - acceptance: fixtures exist and are referenced by docs/tests later
   - PR:

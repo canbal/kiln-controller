@@ -1,0 +1,51 @@
+{
+  "type": "backlog",
+  "profile": {
+    "type": "profile",
+    "name": "cone-05-long-bisque",
+    "data": [[0, 65], [600, 200], [7500, 250]]
+  },
+  "log": [
+    {
+      "cost": 0.0,
+      "runtime": 0,
+      "temperature": 72.4,
+      "target": 65,
+      "state": "RUNNING",
+      "heat": 0,
+      "totaltime": 54600,
+      "kwh_rate": 0.42818,
+      "currency_type": "$",
+      "profile": "cone-05-long-bisque",
+      "pidstats": {}
+    },
+    {
+      "cost": 0.02,
+      "runtime": 12.0,
+      "temperature": 72.4,
+      "target": 65.0,
+      "state": "RUNNING",
+      "heat": 1.0,
+      "totaltime": 54600,
+      "kwh_rate": 0.42818,
+      "currency_type": "$",
+      "profile": "cone-05-long-bisque",
+      "pidstats": {
+        "time": 1739052274.0,
+        "timeDelta": 1.0,
+        "setpoint": 65.0,
+        "ispoint": 72.4,
+        "err": -7.4,
+        "errDelta": -1.2,
+        "p": -370.0,
+        "i": 0.0,
+        "d": -600.0,
+        "kp": 50,
+        "ki": 30,
+        "kd": 500,
+        "pid": -100,
+        "out": 0.0
+      }
+    }
+  ]
+}
