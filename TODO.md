@@ -44,6 +44,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+If `pip install -r requirements.txt` fails on macOS (some deps are Raspberry Pi-specific, e.g. `RPi.GPIO`), use the Docker path below instead.
+
 2) For local mac dev, edit `config.py` (do not commit these local tweaks):
 
 - set `simulate = True` (prevents Raspberry Pi GPIO / thermocouple access)
@@ -64,6 +66,32 @@ Notes:
 
 - If you keep `listening_port = 80`, you will likely need `sudo` on macOS.
 - Before deploying to the kiln, ensure `config.py` is set back to your Pi settings.
+
+#### macOS + Docker (More Reliable)
+
+This runs the server in a Linux container, which tends to avoid macOS build issues.
+
+```bash
+docker run --rm -it \
+  -p 8080:8080 \
+  -v "$PWD":/work \
+  -w /work \
+  python:3.11-slim bash
+```
+
+Inside the container:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Then do the same `config.py` local tweaks (`simulate = True`, `listening_port = 8080`) and run:
+
+```bash
+./kiln-controller.py
+```
 
 ### Visual Validation Checklist (Human-Reviewed PRs)
 
