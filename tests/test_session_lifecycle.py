@@ -95,6 +95,34 @@ class TestSessionLifecycle(unittest.TestCase):
         self.assertEqual(sess["outcome"], "COMPLETED")
         self.assertIsNotNone(sess["ended_at"])
 
+    def test_persist_sample_writes_session_samples_row(self):
+        oven = Oven()
+        oven.board = _FakeBoard()
+
+        profile = Profile(json.dumps({"name": "test_profile", "data": [[0, 70], [60, 100]]}))
+        oven.run_profile(profile)
+
+        oven._persist_sample_if_possible()
+
+        conn = connect(self.db_path)
+        try:
+            sess = self._get_only_session()
+            rows = list(
+                conn.execute(
+                    "SELECT session_id, t, state_json FROM session_samples WHERE session_id = ? ORDER BY t",
+                    (sess["id"],),
+                )
+            )
+            self.assertEqual(len(rows), 1)
+
+            state = json.loads(rows[0]["state_json"])
+            self.assertEqual(state["state"], "RUNNING")
+            self.assertEqual(state["profile"], "test_profile")
+            self.assertIn("temperature", state)
+            self.assertIn("target", state)
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

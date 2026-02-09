@@ -20,9 +20,11 @@ log = logging.getLogger(__name__)
 try:
     from kiln_db import create_session as _sqlite_create_session
     from kiln_db import stop_session as _sqlite_stop_session
+    from kiln_db import add_session_sample as _sqlite_add_session_sample
 except Exception:
     _sqlite_create_session = None
     _sqlite_stop_session = None
+    _sqlite_add_session_sample = None
 
 
 def get_thermocouple_offset(raw_temp):
@@ -311,6 +313,23 @@ class Oven(threading.Thread):
         finally:
             self._active_session_id = None
 
+    def _persist_sample_if_possible(self) -> None:
+        if not self._active_session_id:
+            return
+        if _sqlite_add_session_sample is None:
+            return
+        db_path = self._sqlite_db_path()
+        if not db_path:
+            return
+
+        sid = self._active_session_id
+        try:
+            _sqlite_add_session_sample(db_path, session_id=sid, state=self.get_state())
+        except Exception:
+            # Best-effort: DB failures should never stop kiln control.
+            log.exception("SQLite sample persist failed (id=%s)" % sid)
+            return
+
     def run_profile(self, profile, startat=0):
         # If a new run is started while another is active, treat the prior one as aborted.
         self._stop_session_if_possible(outcome="ABORTED")
@@ -530,6 +549,10 @@ class Oven(threading.Thread):
                 self.update_runtime()
                 self.update_target_temp()
                 self.heat_then_cool()
+
+                # Persist exactly one sample per control loop cycle.
+                self._persist_sample_if_possible()
+
                 self.reset_if_emergency()
                 self.reset_if_schedule_ended()
 
