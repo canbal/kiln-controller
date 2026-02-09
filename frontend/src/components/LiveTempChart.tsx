@@ -525,10 +525,12 @@ export function LiveTempChart(props: LiveTempChartProps) {
     chart.setOption(baseOption, { notMerge: true })
 
     const onDataZoom = () => {
-      if (programmaticZoomRef.current) return
-
-      // Fit the y-axis to the currently visible x-window.
+      // Always fit the y-axis to the currently visible x-window, even for
+      // programmatic zoom changes (Reset/auto live window).
       scheduleYAxisAutorange(chart)
+
+      // For programmatic zoom changes, skip the follow/lock behavior.
+      if (programmaticZoomRef.current) return
 
       // Enforce a minimum zoom span (prevents zooming in too far).
       if (clampMinZoomSpanIfNeeded(chart)) {
