@@ -418,13 +418,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/28
   - commit: ae2ac95a29f440dc6e08571c20da66059e43087d
 
-- [ ] `T-0205` New UI: show progress %, elapsed, and ETA (remaining)
-  - status: IN_PROGRESS
+- [x] `T-0205` New UI: show progress %, elapsed, and ETA (remaining)
+  - status: DONE
   - owner: @opencode
   - deps: `T-0202`
   - acceptance: `/app` shows progress %, runtime vs elapsed, remaining, and adjusted ETA; shows cooldown timer when cooldown capture is active
   - PR: https://github.com/canbal/kiln-controller/pull/31
-  - commit:
+  - commit: f4dc381
 
 ### Milestone 3: Sessions Capture + Cooling Tail Recording (SQLite)
 
@@ -452,13 +452,13 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/27
   - commit: 1cbff47b4d75628db7e19f1f53ecb16b1bcde302
 
-- [ ] `T-0304` Continue recording after profile end until temp threshold/cap reached
-  - status: IN_PROGRESS
+- [x] `T-0304` Continue recording after profile end until temp threshold/cap reached
+  - status: DONE
   - owner: @opencode
   - deps: `T-0303`
   - acceptance: post-profile cooling samples exist and stop at <200F/93C (or 48h)
   - PR: https://github.com/canbal/kiln-controller/pull/30
-  - commit:
+  - commit: 95101d7
 
 ### Milestone 4: Cooling Tail Visualization (Early Feature)
 
