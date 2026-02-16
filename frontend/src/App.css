@@ -676,7 +676,7 @@
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  background: rgba(255, 255, 255, 0.85);
+  background: color-mix(in srgb, var(--card) 92%, var(--bg0));
   color: color-mix(in srgb, var(--text) 92%, transparent);
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -702,14 +702,14 @@
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  background: rgba(255, 255, 255, 0.85);
+  background: color-mix(in srgb, var(--card) 92%, var(--bg0));
   color: color-mix(in srgb, var(--text) 92%, transparent);
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 11px;
   pointer-events: none;
- }
+}
 
 .liveChart {
   width: 100%;

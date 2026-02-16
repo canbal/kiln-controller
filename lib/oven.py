@@ -284,6 +284,7 @@ class Oven(threading.Thread):
                 db_path,
                 profile_name=self.profile.name,
                 outcome="RUNNING",
+                meta={"profile_data": self.profile.data},
             )
             log.info("SQLite session started: %s" % self._active_session_id)
         except Exception:

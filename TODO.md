@@ -549,6 +549,32 @@ Rules:
   - PR: https://github.com/canbal/kiln-controller/pull/45
   - commit: 152bf3c0961dc9f0b94124dad490fd34459c2550
 
+### Side Quests (Ad-Hoc Features)
+
+- [x] `T-SQ01` Add "First Fire Cone 04" element conditioning profile
+  - status: DONE
+  - owner: @canbal
+  - deps:
+  - acceptance: profile appears in `/picoreflow` dropdown; schedule is ~5h with kiln wash drying phase
+  - PR: https://github.com/canbal/kiln-controller/pull/47
+  - commit: b3314ec
+
+- [x] `T-SQ02` Store original profile schedule in session `meta_json` at run start
+  - status: DONE
+  - owner: @canbal
+  - deps: `T-0302`
+  - acceptance: `GET /v1/sessions/:id` returns `schedule` field with original `[[time_sec, temp], ...]` data
+  - PR:
+  - commit:
+
+- [ ] `T-SQ03` Show original schedule line on live and past-session charts
+  - status: PLANNED
+  - owner:
+  - deps: `T-SQ02`
+  - acceptance: third "Schedule" series (dotted line) renders on both LiveTempChart and RecentSessionChart without affecting default zoom levels
+  - PR:
+  - commit:
+
 ### Milestones 7-10: Later Work (Config, Profile Editing, Decommission)
 
 - [ ] `T-0701` Config override file (`config_override.json`) + safe apply semantics (block when RUNNING)
