@@ -1,10 +1,27 @@
-import { parseListSessionSamplesResponse, parseListSessionsResponse } from '../contract/sessions'
+import {
+  parseGetSessionResponse,
+  parseListSessionSamplesResponse,
+  parseListSessionsResponse,
+  parsePatchSessionResponse,
+} from '../contract/sessions'
 import type { Session, SessionSample } from '../contract/sessions'
 
 type ApiOk<T> = { ok: true; value: T }
 type ApiErr = { ok: false; error: string }
 
+function isAbortError(e: unknown): boolean {
+  // Browsers differ:
+  // - DOMException name === 'AbortError'
+  // - message like "signal is aborted without reason"
+  if (typeof e !== 'object' || e === null) return false
+  const maybe = e as { name?: unknown; message?: unknown }
+  if (maybe.name === 'AbortError') return true
+  if (typeof maybe.message === 'string' && maybe.message.toLowerCase().includes('signal is aborted')) return true
+  return false
+}
+
 function errMsg(e: unknown): string {
+  if (isAbortError(e)) return 'aborted'
   if (e instanceof Error) return e.message
   return String(e)
 }
@@ -92,6 +109,41 @@ export async function apiListSessionSamples(opts: {
     if (!parsed.success) return { ok: false, error: parsed.error ?? 'unknown_error' }
 
     return { ok: true, value: { session: parsed.session ?? null, samples: parsed.samples ?? [] } }
+  } catch (e) {
+    return { ok: false, error: errMsg(e) }
+  }
+}
+
+export async function apiGetSession(opts: { sessionId: string; signal?: AbortSignal }): Promise<ApiOk<Session> | ApiErr> {
+  try {
+    const json = await fetchJson(`/v1/sessions/${encodeURIComponent(opts.sessionId)}`, { signal: opts.signal })
+    const parsed = parseGetSessionResponse(json)
+    if (!parsed.success) return { ok: false, error: parsed.error ?? 'unknown_error' }
+    if (!parsed.session) return { ok: false, error: 'missing_session' }
+    return { ok: true, value: parsed.session }
+  } catch (e) {
+    return { ok: false, error: errMsg(e) }
+  }
+}
+
+export async function apiPatchSessionNotes(opts: {
+  sessionId: string
+  notes: string | null
+  signal?: AbortSignal
+}): Promise<ApiOk<Session> | ApiErr> {
+  try {
+    const json = await fetchJson(`/v1/sessions/${encodeURIComponent(opts.sessionId)}`, {
+      method: 'PATCH',
+      signal: opts.signal,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ notes: opts.notes }),
+    })
+    const parsed = parsePatchSessionResponse(json)
+    if (!parsed.success) return { ok: false, error: parsed.error ?? 'unknown_error' }
+    if (!parsed.session) return { ok: false, error: 'missing_session' }
+    return { ok: true, value: parsed.session }
   } catch (e) {
     return { ok: false, error: errMsg(e) }
   }

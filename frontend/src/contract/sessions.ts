@@ -12,6 +12,8 @@ export const sessionSchema = z
     ended_at: z.number().nullable(),
     profile_name: z.string().nullable(),
     outcome: z.string().nullable(),
+    // Notes are optional in list responses, but present in GET /v1/sessions/:id.
+    notes: z.string().nullable().optional(),
   })
   .passthrough()
 
@@ -44,6 +46,17 @@ export const listSessionSamplesResponseSchema = z
   })
   .passthrough()
 
+export const getSessionResponseSchema = z
+  .object({
+    success: z.boolean(),
+    session_id: z.string().optional(),
+    session: sessionSchema.optional(),
+    error: z.string().optional(),
+  })
+  .passthrough()
+
+export const patchSessionResponseSchema = getSessionResponseSchema
+
 export type Session = z.infer<typeof sessionSchema>
 export type SessionSample = z.infer<typeof sessionSampleSchema>
 
@@ -56,5 +69,17 @@ export function parseListSessionsResponse(input: unknown): z.infer<typeof listSe
 export function parseListSessionSamplesResponse(input: unknown): z.infer<typeof listSessionSamplesResponseSchema> {
   const parsed = listSessionSamplesResponseSchema.safeParse(input)
   if (!parsed.success) throw new Error('Invalid /v1/sessions/:id/samples response')
+  return parsed.data
+}
+
+export function parseGetSessionResponse(input: unknown): z.infer<typeof getSessionResponseSchema> {
+  const parsed = getSessionResponseSchema.safeParse(input)
+  if (!parsed.success) throw new Error('Invalid /v1/sessions/:id response')
+  return parsed.data
+}
+
+export function parsePatchSessionResponse(input: unknown): z.infer<typeof patchSessionResponseSchema> {
+  const parsed = patchSessionResponseSchema.safeParse(input)
+  if (!parsed.success) throw new Error('Invalid PATCH /v1/sessions/:id response')
   return parsed.data
 }
