@@ -7,12 +7,14 @@ import {
   TooltipComponent,
   DataZoomComponent,
   TitleComponent,
+  ToolboxComponent,
+  BrushComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsType } from 'echarts/core'
 import type { OvenState, StatusBacklogEnvelope } from '../contract/status'
 
-echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, DataZoomComponent, TitleComponent, CanvasRenderer])
+echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, DataZoomComponent, TitleComponent, ToolboxComponent, BrushComponent, CanvasRenderer])
 
 type Point = [number, number | null]
 
@@ -481,6 +483,19 @@ export function LiveTempChart(props: LiveTempChartProps) {
     () => ({
       animation: false,
       grid: { left: 44, right: 14, top: 34, bottom: 54 },
+      brush: {
+        xAxisIndex: 0,
+        brushType: 'lineX',
+        brushMode: 'single',
+        transformable: false,
+        throttleType: 'debounce',
+        throttleDelay: 0,
+        brushStyle: {
+          borderWidth: 1,
+          color: 'rgba(120, 140, 180, 0.15)',
+          borderColor: 'rgba(120, 140, 180, 0.5)',
+        },
+      },
       legend: {
         top: 0,
         left: 0,
@@ -590,6 +605,60 @@ export function LiveTempChart(props: LiveTempChartProps) {
     chartRef.current = chart
     chart.setOption(baseOption, { notMerge: true })
 
+    // Activate brush immediately so user can click+drag without clicking a button.
+    const activateBrush = () => {
+      chart.dispatchAction({
+        type: 'takeGlobalCursor',
+        key: 'brush',
+        brushOption: { brushType: 'lineX', brushMode: 'single' },
+      })
+    }
+    activateBrush()
+
+    // Brush-to-zoom: when user drags a region, zoom the x-axis to it.
+    const onBrushEnd = (...args: unknown[]) => {
+      const params = (args[0] ?? {}) as Record<string, unknown>
+      const areas = (params as { areas?: { coordRange?: [number, number] }[] }).areas
+      if (!areas?.length) return
+      const range = areas[0]?.coordRange
+      if (!range || range.length < 2) return
+
+      const [startValue, endValue] = range
+      if (!(endValue > startValue)) return
+
+      // Clear the brush selection immediately.
+      chart.dispatchAction({ type: 'brush', areas: [] })
+
+      // Apply zoom.
+      programmaticZoomRef.current = true
+      chart.setOption(
+        {
+          dataZoom: [
+            { rangeMode: ['value', 'value'], startValue, endValue },
+            { rangeMode: ['value', 'value'], startValue, endValue },
+          ],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+
+      // Treat as manual zoom.
+      autoLiveWindowRef.current = false
+      setAutoLiveWindow(false)
+      followLiveRef.current = false
+      setFollowLive(false)
+      lockedRangeRef.current = { startValue, endValue }
+
+      window.setTimeout(() => {
+        programmaticZoomRef.current = false
+      }, 0)
+
+      scheduleYAxisAutorange(chart)
+
+      // Re-activate brush so the next drag works immediately.
+      activateBrush()
+    }
+    chart.on('brushEnd', onBrushEnd)
+
     const onDataZoom = () => {
       // Always fit the y-axis to the currently visible x-window, even for
       // programmatic zoom changes (Reset/auto live window).
@@ -685,6 +754,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     return () => {
       ro.disconnect()
+      chart.off('brushEnd', onBrushEnd)
       chart.off('dataZoom', onDataZoom)
       chartRef.current = null
       if (yAutorangeRafRef.current !== null) {

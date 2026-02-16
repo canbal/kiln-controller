@@ -8,6 +8,7 @@ import {
   DataZoomComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  BrushComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsType } from 'echarts/core'
@@ -22,6 +23,7 @@ echarts.use([
   DataZoomComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  BrushComponent,
   CanvasRenderer,
 ])
 
@@ -287,6 +289,19 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
     const base = {
       animation: false,
       grid: { left: 44, right: 14, top: 34, bottom: 54 },
+      brush: {
+        xAxisIndex: 0,
+        brushType: 'lineX',
+        brushMode: 'single',
+        transformable: false,
+        throttleType: 'debounce',
+        throttleDelay: 0,
+        brushStyle: {
+          borderWidth: 1,
+          color: 'rgba(120, 140, 180, 0.15)',
+          borderColor: 'rgba(120, 140, 180, 0.5)',
+        },
+      },
       legend: {
         top: 0,
         left: 0,
@@ -390,6 +405,48 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
     chart.setOption(base, { notMerge: true })
 
+    // Activate brush immediately so user can click+drag without clicking a button.
+    const activateBrush = () => {
+      chart.dispatchAction({
+        type: 'takeGlobalCursor',
+        key: 'brush',
+        brushOption: { brushType: 'lineX', brushMode: 'single' },
+      })
+    }
+    activateBrush()
+
+    // Brush-to-zoom: when user drags a region, zoom the x-axis to it.
+    const onBrushEnd = (...args: unknown[]) => {
+      const params = (args[0] ?? {}) as Record<string, unknown>
+      const areas = (params as { areas?: { coordRange?: [number, number] }[] }).areas
+      if (!areas?.length) return
+      const range = areas[0]?.coordRange
+      if (!range || range.length < 2) return
+
+      const [startValue, endValue] = range
+      if (!(endValue > startValue)) return
+
+      // Clear the brush selection immediately.
+      chart.dispatchAction({ type: 'brush', areas: [] })
+
+      // Apply zoom.
+      chart.setOption(
+        {
+          dataZoom: [
+            { rangeMode: ['value', 'value'], startValue, endValue },
+            { rangeMode: ['value', 'value'], startValue, endValue },
+          ],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+
+      scheduleYAxisAutorange()
+
+      // Re-activate brush so the next drag works immediately.
+      activateBrush()
+    }
+    chart.on('brushEnd', onBrushEnd)
+
     const onDataZoom = () => {
       scheduleYAxisAutorange()
     }
@@ -403,6 +460,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
     return () => {
       ro.disconnect()
+      chart.off('brushEnd', onBrushEnd)
       chart.off('dataZoom', onDataZoom)
       chartRef.current = null
       scheduleYAxisAutorangeRef.current = null

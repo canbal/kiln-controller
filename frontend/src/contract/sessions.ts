@@ -14,6 +14,9 @@ export const sessionSchema = z
     outcome: z.string().nullable(),
     // Notes are optional in list responses, but present in GET /v1/sessions/:id.
     notes: z.string().nullable().optional(),
+    // Original profile schedule captured at session start: [[time_seconds, temp], ...].
+    // Present only in GET /v1/sessions/:id when profile_data was stored in meta_json.
+    schedule: z.array(z.tuple([z.number(), z.number()])).nullable().optional(),
   })
   .passthrough()
 
