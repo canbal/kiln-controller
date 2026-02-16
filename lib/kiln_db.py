@@ -258,13 +258,27 @@ def get_session(
     try:
         row = conn.execute(
             """
-            SELECT id, created_at, started_at, ended_at, profile_name, outcome, notes
+            SELECT id, created_at, started_at, ended_at, profile_name, outcome, notes, meta_json
             FROM sessions
             WHERE id = ?
             """,
             (session_id,),
         ).fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        d = dict(row)
+        # Parse meta_json and expose profile_data as top-level "schedule" key.
+        raw = d.pop("meta_json", None)
+        schedule = None
+        if raw:
+            try:
+                meta = json.loads(raw)
+                if isinstance(meta, dict):
+                    schedule = meta.get("profile_data")
+            except (json.JSONDecodeError, TypeError):
+                pass
+        d["schedule"] = schedule
+        return d
     finally:
         conn.close()
 
