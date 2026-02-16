@@ -290,6 +290,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       animation: false,
       grid: { left: 44, right: 14, top: 34, bottom: 54 },
       brush: {
+        toolbox: [],
         xAxisIndex: 0,
         brushType: 'lineX',
         brushMode: 'single',

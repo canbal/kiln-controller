@@ -7,14 +7,13 @@ import {
   TooltipComponent,
   DataZoomComponent,
   TitleComponent,
-  ToolboxComponent,
   BrushComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsType } from 'echarts/core'
 import type { OvenState, StatusBacklogEnvelope } from '../contract/status'
 
-echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, DataZoomComponent, TitleComponent, ToolboxComponent, BrushComponent, CanvasRenderer])
+echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, DataZoomComponent, TitleComponent, BrushComponent, CanvasRenderer])
 
 type Point = [number, number | null]
 
@@ -484,6 +483,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
       animation: false,
       grid: { left: 44, right: 14, top: 34, bottom: 54 },
       brush: {
+        toolbox: [],
         xAxisIndex: 0,
         brushType: 'lineX',
         brushMode: 'single',
