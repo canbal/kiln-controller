@@ -456,6 +456,8 @@
 
 .sessions,
 .sessionDetail {
+  display: grid;
+  gap: 12px;
   animation: enter 240ms ease-out both;
 }
 
