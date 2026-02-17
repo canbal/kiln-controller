@@ -318,7 +318,6 @@ function App() {
         <article className="card card--span2" aria-label="Chart">
           <h2>Live Temperature</h2>
           <LiveTempChart state={status.state} backlog={status.backlog} tempScale={cfg.tempScale} theme={theme} />
-          <p className="muted chartHint">Scroll/2-finger to pan. Pinch (or ctrl+scroll) to zoom. Drag to pan.</p>
         </article>
 
         </section>
