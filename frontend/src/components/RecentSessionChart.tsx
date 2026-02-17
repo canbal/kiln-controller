@@ -12,7 +12,7 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsType } from 'echarts/core'
-import { apiListSessionSamples, apiListSessions } from '../api/sessions'
+import { apiGetSession, apiListSessionSamples, apiListSessions } from '../api/sessions'
 import type { Session, SessionSample } from '../contract/sessions'
 
 echarts.use([
@@ -50,6 +50,7 @@ type ChartScheme = {
 
   seriesActual: string
   seriesTarget: string
+  seriesSchedule: string
   seriesTail: string
 
   markerLine: string
@@ -77,6 +78,7 @@ function schemeForTheme(theme: 'stoneware' | 'dark'): ChartScheme {
 
       seriesActual: 'rgba(56, 109, 140, 0.95)',
       seriesTarget: 'rgba(138, 90, 68, 0.95)',
+      seriesSchedule: 'rgba(90, 140, 90, 0.70)',
       seriesTail: 'rgba(143, 132, 121, 0.92)',
 
       markerLine: 'rgba(138, 90, 68, 0.85)',
@@ -104,6 +106,7 @@ function schemeForTheme(theme: 'stoneware' | 'dark'): ChartScheme {
 
     seriesActual: 'rgba(75, 160, 255, 0.95)',
     seriesTarget: 'rgba(240, 176, 74, 0.95)',
+    seriesSchedule: 'rgba(120, 200, 120, 0.70)',
     seriesTail: 'rgba(184, 198, 214, 0.92)',
 
     markerLine: 'rgba(240, 176, 74, 0.85)',
@@ -182,11 +185,12 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [samples, setSamples] = useState<SessionSample[]>([])
+  const [scheduleRaw, setScheduleRaw] = useState<[number, number][] | null>(null)
 
   const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
   const unitRef = useRef(unit)
 
-  const seriesDataRef = useRef<[Point[], Point[], Point[]]>([[], [], []])
+  const seriesDataRef = useRef<[Point[], Point[], Point[], Point[]]>([[], [], [], []])
   const timeExtentMsRef = useRef<{ min: number; max: number } | null>(null)
   const scheduleYAxisAutorangeRef = useRef<(() => void) | null>(null)
   const lastAppliedYRef = useRef<{ min: number; max: number } | null>(null)
@@ -243,20 +247,39 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         }
       }
 
-      const [s0, s1, s2] = seriesDataRef.current
+      // For sparse series (schedule), also consider interpolated line segments
+      // that cross the zoom window even when no waypoints fall inside it.
+      const scanInterpolated = (pts: Point[]) => {
+        for (let i = 0; i < pts.length - 1; i++) {
+          const [t0, y0] = pts[i]
+          const [t1, y1] = pts[i + 1]
+          if (y0 === null || y1 === null || !Number.isFinite(y0) || !Number.isFinite(y1)) continue
+          if (t1 < win.startValue || t0 > win.endValue) continue
+          const lerp = (t: number) => y0 + (y1 - y0) * ((t - t0) / (t1 - t0))
+          const ys = t0 >= win.startValue ? y0 : lerp(win.startValue)
+          const ye = t1 <= win.endValue ? y1 : lerp(win.endValue)
+          if (ys < minY) minY = ys
+          if (ys > maxY) maxY = ys
+          if (ye < minY) minY = ye
+          if (ye > maxY) maxY = ye
+        }
+      }
+
+      const [s0, s1, s2, s3] = seriesDataRef.current
       scan(s0)
       scan(s1)
       scan(s2)
+      scanInterpolated(s3)
 
       if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return null
       let span = maxY - minY
       if (!(span > 0)) span = 1
       const pad = Math.max(1, span * 0.08)
-      const min = Math.max(0, minY - pad)
+      const min = minY - pad
       const max = maxY + pad
       if (max - min < 2) {
         const mid = (max + min) / 2
-        return { min: Math.max(0, mid - 1), max: mid + 1 }
+        return { min: mid - 1, max: mid + 1 }
       }
       return { min, max }
     }
@@ -288,7 +311,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
     const base = {
       animation: false,
-      grid: { left: 44, right: 14, top: 34, bottom: 54 },
+      grid: { left: 58, right: 14, top: 34, bottom: 54 },
       brush: {
         toolbox: [],
         xAxisIndex: 0,
@@ -401,6 +424,17 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           lineStyle: { width: 2, type: 'dashed', color: scheme.seriesTarget },
           sampling: 'lttb',
         },
+        {
+          name: 'Schedule',
+          type: 'line',
+          z: 1,
+          showSymbol: true,
+          symbolSize: 6,
+          symbol: 'circle',
+          data: [] as Point[],
+          itemStyle: { color: scheme.seriesSchedule },
+          lineStyle: { width: 1.5, type: 'dotted', color: scheme.seriesSchedule },
+        },
       ],
     }
 
@@ -498,6 +532,12 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
 
       setSession(picked)
 
+      // Fetch full session detail (includes schedule from meta_json).
+      const detailRes = await apiGetSession({ sessionId: picked.id, signal: ac.signal })
+      if (detailRes.ok && detailRes.value.schedule) {
+        setScheduleRaw(detailRes.value.schedule)
+      }
+
       // Fetch a bounded window around profile end.
       // Goal: clearly show a tail beyond end-of-profile without pulling an entire multi-hour session.
       const endedAt = typeof picked.ended_at === 'number' ? picked.ended_at : null
@@ -574,6 +614,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
   }, [])
 
   const chartPoints = useMemo(() => {
+    const startedAtSec = session && typeof session.started_at === 'number' ? session.started_at : null
     const endedAt = session && typeof session.ended_at === 'number' ? session.ended_at : null
     const endMs = endedAt !== null ? endedAt * 1000 : null
 
@@ -596,14 +637,35 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       }
     }
 
-    return { actualProfile, actualCooldown, target, endMs }
-  }, [samples, session])
+    const schedule: Point[] = []
+    if (scheduleRaw && startedAtSec !== null) {
+      for (const [sec, temp] of scheduleRaw) {
+        schedule.push([startedAtSec * 1000 + sec * 1000, temp])
+      }
+    }
+
+    return { actualProfile, actualCooldown, target, schedule, endMs }
+  }, [samples, session, scheduleRaw])
 
   useEffect(() => {
-    seriesDataRef.current = [chartPoints.actualProfile, chartPoints.actualCooldown, chartPoints.target]
+    seriesDataRef.current = [chartPoints.actualProfile, chartPoints.actualCooldown, chartPoints.target, chartPoints.schedule]
     const firstMs = samples.length ? samples[0]!.t * 1000 : null
     const lastMs = samples.length ? samples[samples.length - 1]!.t * 1000 : null
     timeExtentMsRef.current = firstMs !== null && lastMs !== null && lastMs > firstMs ? { min: firstMs, max: lastMs } : null
+
+    // Anchor zoom to sample extent so schedule data doesn't expand the initial view.
+    const ext = timeExtentMsRef.current
+    if (ext && chartRef.current) {
+      chartRef.current.setOption(
+        {
+          dataZoom: [
+            { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
+            { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
+          ],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+    }
 
     // Re-fit y-axis when data changes (initial load / session switch).
     lastAppliedYRef.current = null
@@ -669,6 +731,9 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
           },
           {
             data: chartPoints.target,
+          },
+          {
+            data: chartPoints.schedule,
           },
         ],
         title: {
