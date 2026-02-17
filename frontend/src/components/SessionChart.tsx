@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { EChartsType } from 'echarts/core'
 import { apiGetSession, apiListSessions } from '../api/sessions'
 import type { Session } from '../contract/sessions'
 import { extractTemp, extractTarget } from '../util/sampleExtract'
 import { fetchAllSessionSamples } from '../util/fetchSessionSamples'
 import type { Point } from '../util/chartFormatting'
-import { fmtTemp, fmtAxisTime } from '../util/chartFormatting'
 import { schemeForTheme } from '../util/chartTheme'
-import { setupChart, resetYAxisCache } from '../util/chartSetup'
+import { resetYAxisCache } from '../util/chartSetup'
+import { buildBaseOption, buildMarkLine, buildMarkArea } from '../util/chartOptions'
+import { useChartCore } from '../hooks/useChartCore'
 
 type SessionChartProps = {
   sessionId?: string
@@ -30,233 +30,53 @@ export function SessionChart(props: SessionChartProps) {
   const theme = props.theme ?? 'stoneware'
   const scheme = useMemo(() => schemeForTheme(theme), [theme])
 
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  const chartRef = useRef<EChartsType | null>(null)
-  const setupRef = useRef<ReturnType<typeof setupChart> | null>(null)
-  const programmaticZoomRef = useRef(false)
+  const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
+  const unitRef = useRef(unit)
+  useEffect(() => { unitRef.current = unit }, [unit])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-
   const [sampleCount, setSampleCount] = useState(0)
+  const [zoomed, setZoomed] = useState(false)
 
   const seriesDataRef = useRef<[Point[], Point[], Point[], Point[]]>([[], [], [], []])
   const timeExtentMsRef = useRef<{ min: number; max: number } | null>(null)
 
-  const [zoomSpanLabel, setZoomSpanLabel] = useState<string | null>(null)
-  const zoomSpanHideTimerRef = useRef<number | null>(null)
-  const [zoomed, setZoomed] = useState(false)
+  const baseOption = useMemo(
+    () => buildBaseOption(scheme, unitRef, { seriesActualName: 'Actual (profile)' }),
+    [scheme],
+  )
 
-  const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
-  const unitRef = useRef(unit)
-  useEffect(() => {
-    unitRef.current = unit
-  }, [unit])
-
-  const showZoomSpanHint = () => {
-    const setup = setupRef.current
-    if (!setup) return
-    const label = setup.showZoomSpanHint()
-    if (!label) return
-    setZoomSpanLabel(label)
-    if (zoomSpanHideTimerRef.current !== null) {
-      window.clearTimeout(zoomSpanHideTimerRef.current)
-    }
-    zoomSpanHideTimerRef.current = window.setTimeout(() => {
-      zoomSpanHideTimerRef.current = null
-      setZoomSpanLabel(null)
-    }, 900)
-  }
+  const {
+    hostRef, chartRef, setupRef,
+    zoomSpanLabel, showZoomSpanHint, programmaticZoom,
+  } = useChartCore(baseOption, {
+    onManualZoom: () => { setZoomed(true); showZoomSpanHint() },
+    getDataExtent: () => timeExtentMsRef.current,
+    getSeriesForYRange: () => {
+      const [s0, s1, s2, s3] = seriesDataRef.current
+      return { scan: [s0, s1, s2], interpolate: [s3] }
+    },
+    minZoomMs: 10_000,
+  })
 
   const resetZoom = () => {
     const chart = chartRef.current
     if (!chart) return
     const ext = timeExtentMsRef.current
     if (ext) {
-      programmaticZoomRef.current = true
-      chart.setOption(
-        {
-          dataZoom: [
-            { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
-            { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
-          ],
-        },
-        { notMerge: false, lazyUpdate: true },
-      )
-      window.setTimeout(() => { programmaticZoomRef.current = false }, 0)
+      programmaticZoom({
+        dataZoom: [
+          { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
+          { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
+        ],
+      })
     } else {
       chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
     }
     setZoomed(false)
   }
-
-  // --- Chart init effect ---
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-
-    const baseOption = {
-      animation: false,
-      grid: { left: 58, right: 14, top: 34, bottom: 54 },
-      brush: {
-        toolbox: [],
-        xAxisIndex: 0,
-        brushType: 'lineX',
-        brushMode: 'single',
-        transformable: false,
-        throttleType: 'debounce',
-        throttleDelay: 0,
-        brushStyle: {
-          borderWidth: 1,
-          color: 'rgba(120, 140, 180, 0.15)',
-          borderColor: 'rgba(120, 140, 180, 0.5)',
-        },
-      },
-      legend: {
-        top: 0,
-        left: 0,
-        itemWidth: 10,
-        itemHeight: 10,
-        textStyle: { color: scheme.text, fontSize: 12 },
-      },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'line' },
-        backgroundColor: scheme.tooltipBg,
-        borderColor: scheme.tooltipBorder,
-        textStyle: { color: scheme.textStrong },
-        valueFormatter: (v: unknown) => {
-          const u = unitRef.current
-          return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
-        },
-      },
-      dataZoom: [
-        {
-          type: 'inside',
-          xAxisIndex: 0,
-          filterMode: 'none',
-          start: 0,
-          end: 100,
-          zoomOnMouseWheel: 'ctrl',
-          moveOnMouseWheel: true,
-        },
-        {
-          type: 'slider',
-          xAxisIndex: 0,
-          start: 0,
-          end: 100,
-          height: 18,
-          bottom: 10,
-          backgroundColor: scheme.zoomBg,
-          borderColor: scheme.zoomBorder,
-          fillerColor: scheme.zoomFill,
-          handleStyle: { color: scheme.zoomHandle, borderColor: scheme.zoomHandleBorder },
-          textStyle: { color: scheme.text },
-          zoomOnMouseWheel: 'ctrl',
-          moveOnMouseWheel: true,
-        },
-      ],
-      xAxis: {
-        type: 'time',
-        minInterval: 60_000,
-        axisLabel: {
-          color: scheme.text,
-          formatter: (v: number) => fmtAxisTime(v),
-          hideOverlap: true,
-        },
-        axisLine: { lineStyle: { color: scheme.line } },
-        splitLine: { lineStyle: { color: scheme.grid } },
-      },
-      yAxis: {
-        type: 'value',
-        boundaryGap: ['10%', '10%'],
-        minInterval: 0.5,
-        axisLabel: {
-          color: scheme.text,
-          formatter: (v: number) => {
-            const u = unitRef.current
-            return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
-          },
-        },
-        axisLine: { lineStyle: { color: scheme.line } },
-        splitLine: { lineStyle: { color: scheme.grid } },
-      },
-      series: [
-        {
-          name: 'Actual (profile)',
-          type: 'line',
-          showSymbol: false,
-          data: [] as Point[],
-          itemStyle: { color: scheme.seriesActual },
-          lineStyle: { width: 2, color: scheme.seriesActual },
-          sampling: 'lttb',
-        },
-        {
-          name: 'Cooldown tail',
-          type: 'line',
-          showSymbol: false,
-          data: [] as Point[],
-          itemStyle: { color: scheme.seriesTail },
-          lineStyle: { width: 2, color: scheme.seriesTail },
-          sampling: 'lttb',
-        },
-        {
-          name: 'Target',
-          type: 'line',
-          showSymbol: false,
-          data: [] as Point[],
-          itemStyle: { color: scheme.seriesTarget },
-          lineStyle: { width: 2, type: 'dashed', color: scheme.seriesTarget },
-          sampling: 'lttb',
-        },
-        {
-          name: 'Schedule',
-          type: 'line',
-          z: 1,
-          showSymbol: true,
-          symbolSize: 6,
-          symbol: 'circle',
-          data: [] as Point[],
-          itemStyle: { color: scheme.seriesSchedule },
-          lineStyle: { width: 1.5, type: 'dotted', color: scheme.seriesSchedule },
-        },
-      ],
-    }
-
-    const onManualZoom = () => {
-      setZoomed(true)
-      showZoomSpanHint()
-    }
-
-    const result = setupChart(
-      host,
-      baseOption,
-      {
-        onManualZoom,
-        getDataExtent: () => timeExtentMsRef.current,
-        getSeriesForYRange: () => {
-          const [s0, s1, s2, s3] = seriesDataRef.current
-          return { scan: [s0, s1, s2], interpolate: [s3] }
-        },
-        minZoomMs: 10_000,
-      },
-      programmaticZoomRef,
-    )
-
-    chartRef.current = result.chart
-    setupRef.current = result
-
-    return () => {
-      result.destroy()
-      chartRef.current = null
-      setupRef.current = null
-      if (zoomSpanHideTimerRef.current !== null) {
-        window.clearTimeout(zoomSpanHideTimerRef.current)
-        zoomSpanHideTimerRef.current = null
-      }
-    }
-  }, [scheme])
 
   // --- Data fetch effect ---
   useEffect(() => {
@@ -270,7 +90,6 @@ export function SessionChart(props: SessionChartProps) {
       let picked: Session | null = null
 
       if (props.sessionId) {
-        // Direct session ID provided — fetch it directly.
         const detailRes = await apiGetSession({ sessionId: props.sessionId, signal: ac.signal })
         if (!detailRes.ok) {
           setError(detailRes.error)
@@ -279,7 +98,6 @@ export function SessionChart(props: SessionChartProps) {
         }
         picked = detailRes.value
       } else {
-        // Auto-pick most recent session.
         const sessRes = await apiListSessions({ limit: 10, offset: 0, signal: ac.signal })
         if (!sessRes.ok) {
           setError(sessRes.error)
@@ -360,51 +178,19 @@ export function SessionChart(props: SessionChartProps) {
       if (chart && setup) {
         const hasTail = actualCooldown.some((p) => p[1] !== null)
         const maxMs = samples.length ? samples[samples.length - 1].t * 1000 : null
-        const markArea = endMs !== null && maxMs !== null && maxMs > endMs
+        const hasMarkArea = endMs !== null && maxMs !== null && maxMs > endMs
 
         chart.setOption(
           {
             series: [
               {
                 data: actualProfile,
-                markLine:
-                  endMs !== null
-                    ? {
-                        silent: true,
-                        symbol: ['none', 'none'],
-                        lineStyle: { color: scheme.markerLine, width: 2, type: 'solid' },
-                        label: {
-                          show: true,
-                          formatter: 'Profile end',
-                          color: scheme.markerLine,
-                          fontWeight: 800,
-                          padding: [2, 6, 2, 6],
-                          backgroundColor: scheme.markerLabelBg,
-                          borderColor: scheme.markerLabelBorder,
-                          borderWidth: 1,
-                          borderRadius: 8,
-                        },
-                        data: [{ xAxis: endMs }],
-                      }
-                    : undefined,
+                markLine: endMs !== null ? buildMarkLine(endMs, scheme) : undefined,
               },
               {
                 data: actualCooldown,
                 lineStyle: { width: 2, type: hasTail ? 'solid' : 'dotted' },
-                markArea: markArea
-                  ? {
-                      silent: true,
-                      itemStyle: { color: scheme.tailShade },
-                      label: {
-                        show: true,
-                        color: scheme.tailLabel,
-                        fontWeight: 800,
-                        formatter: 'Cooldown tail',
-                        position: 'insideTop',
-                      },
-                      data: [[{ xAxis: endMs }, { xAxis: maxMs }]],
-                    }
-                  : undefined,
+                markArea: hasMarkArea ? buildMarkArea(endMs, maxMs!, scheme) : undefined,
               },
               { data: target },
               { data: schedule },
@@ -416,17 +202,12 @@ export function SessionChart(props: SessionChartProps) {
         // Anchor zoom to sample extent.
         const ext = timeExtentMsRef.current
         if (ext) {
-          programmaticZoomRef.current = true
-          chart.setOption(
-            {
-              dataZoom: [
-                { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
-                { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
-              ],
-            },
-            { notMerge: false, lazyUpdate: true },
-          )
-          window.setTimeout(() => { programmaticZoomRef.current = false }, 0)
+          programmaticZoom({
+            dataZoom: [
+              { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
+              { rangeMode: ['value', 'value'], startValue: ext.min, endValue: ext.max },
+            ],
+          })
         }
 
         resetYAxisCache(setup.scheduleYAxisAutorange)
