@@ -196,10 +196,7 @@ export function SessionDetailPage(props: {
           </article>
 
           <article className="card card--span2" aria-label="Session chart">
-            <div className="cardHead">
-              <h2>Temperature Chart</h2>
-              <div className="cardHeadMeta muted">Actual + target + cooldown tail</div>
-            </div>
+            <h2>Temperature Chart</h2>
             <SessionChart sessionId={sessionId} tempScale={props.tempScale ?? null} theme={props.theme} />
           </article>
 
