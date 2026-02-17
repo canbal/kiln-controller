@@ -12,6 +12,8 @@ import {
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsType } from 'echarts/core'
 import type { OvenState, StatusBacklogEnvelope } from '../contract/status'
+import { apiListSessions, apiListSessionSamples, apiGetSession } from '../api/sessions'
+import { extractTemp, extractTarget } from '../util/sampleExtract'
 
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, DataZoomComponent, TitleComponent, BrushComponent, CanvasRenderer])
 
@@ -133,6 +135,10 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const pointerDownRef = useRef(false)
 
   const seededRef = useRef(false)
+  const dbFetchPendingRef = useRef(false)
+  const dbFetchDoneRef = useRef(false)
+  const wsPendingBufferRef = useRef<OvenState[]>([])
+  const runStartMsRef = useRef(0)
   const lastPointAtRef = useRef<number | null>(null)
   const actualRef = useRef<Point[]>([])
   const targetRef = useRef<Point[]>([])
@@ -776,10 +782,156 @@ export function LiveTempChart(props: LiveTempChartProps) {
     }
   }, [baseOption])
 
+  // DB-seed effect: fetch full-resolution session data from the DB once on connect.
+  // Only runs when the oven is RUNNING (has an active session). Falls through to
+  // the backlog-seed effect on failure or when IDLE.
+  useEffect(() => {
+    const backlog = props.backlog
+    if (!backlog) return
+    if (seededRef.current || dbFetchPendingRef.current || dbFetchDoneRef.current) return
+    if (!chartRef.current) return
+
+    // Only attempt DB seed when oven is RUNNING.
+    const lastLog = backlog.log.length > 0 ? backlog.log[backlog.log.length - 1] : null
+    if (!lastLog || lastLog.state !== 'RUNNING') return
+
+    const ac = new AbortController()
+    dbFetchPendingRef.current = true
+
+    const run = async () => {
+      // 1. Find the active (not-yet-ended) session.
+      const listRes = await apiListSessions({ limit: 5, signal: ac.signal })
+      if (!listRes.ok) throw new Error(listRes.error)
+      const activeSession = listRes.value.find((s) => s.ended_at === null)
+      if (!activeSession) throw new Error('no_active_session')
+
+      // 2. Fetch session detail to get the schedule.
+      const detailRes = await apiGetSession({ sessionId: activeSession.id, signal: ac.signal })
+      if (!detailRes.ok) throw new Error(detailRes.error)
+      const session = detailRes.value
+
+      // 3. Fetch samples with smart pagination: only the most recent `maxPoints` seconds.
+      const nowSec = Math.floor(Date.now() / 1000)
+      const startedAt = session.started_at ?? session.created_at
+      const fromSec = Math.max(startedAt, nowSec - maxPoints)
+
+      const PAGE_SIZE = 5000
+      const allSamples: { t: number; state: unknown }[] = []
+      let pageFrom = fromSec
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const samplesRes = await apiListSessionSamples({
+          sessionId: activeSession.id,
+          from: pageFrom,
+          limit: PAGE_SIZE,
+          signal: ac.signal,
+        })
+        if (!samplesRes.ok) throw new Error(samplesRes.error)
+        const chunk = samplesRes.value.samples
+        for (const s of chunk) allSamples.push({ t: s.t, state: s.state })
+        if (chunk.length < PAGE_SIZE) break
+        // Advance `from` past the last sample's timestamp for the next page.
+        pageFrom = chunk[chunk.length - 1].t + 1
+      }
+
+      // Dedupe by timestamp (just in case).
+      const seen = new Set<number>()
+      const deduped = allSamples.filter((s) => {
+        if (seen.has(s.t)) return false
+        seen.add(s.t)
+        return true
+      })
+      deduped.sort((a, b) => a.t - b.t)
+
+      // 4. Compute runStartMs first — used for both data and schedule.
+      const runStartMs = startedAt * 1000
+      runStartMsRef.current = runStartMs
+
+      // 5. Build actual[] / target[] from DB samples using runtime-based timestamps
+      //    so they're on the same time base as the schedule (profile seconds).
+      const extractRuntime = (state: unknown): number | null => {
+        if (!state || typeof state !== 'object') return null
+        const v = (state as Record<string, unknown>).runtime
+        return typeof v === 'number' && Number.isFinite(v) ? v : null
+      }
+
+      const actual: Point[] = []
+      const target: Point[] = []
+      for (const s of deduped) {
+        const rt = extractRuntime(s.state)
+        const tMs = rt !== null ? runStartMs + rt * 1000 : s.t * 1000
+        actual.push([tMs, extractTemp(s.state)])
+        target.push([tMs, extractTarget(s.state)])
+      }
+
+      // 6. Build schedule[] from session detail or fallback to backlog profile.
+      let schedule: Point[] = []
+      if (session.schedule && session.schedule.length > 0) {
+        schedule = session.schedule.map(([sec, temp]) => [runStartMs + sec * 1000, temp] as Point)
+      } else if (backlog.profile?.data) {
+        schedule = backlog.profile.data.map(([sec, temp]) => [runStartMs + sec * 1000, temp] as Point)
+      }
+
+      // 7. Drain the WS pending buffer: append entries whose runtime is past the last DB sample.
+      const lastDbRuntimeMs = actual.length > 0 ? actual[actual.length - 1][0] : runStartMs
+      const buffered = wsPendingBufferRef.current
+      wsPendingBufferRef.current = []
+      for (const entry of buffered) {
+        const entryT = runStartMs + entry.runtime * 1000
+        if (entryT <= lastDbRuntimeMs) continue
+        actual.push([entryT, Number.isFinite(entry.temperature) ? entry.temperature : null])
+        target.push([entryT, isTargetAvailable(entry) ? entry.target : null])
+      }
+
+      // 7. Seed the chart.
+      const chart = chartRef.current
+      if (!chart) return
+
+      clampHistory(actual, maxPoints)
+      clampHistory(target, maxPoints)
+      actualRef.current = actual
+      targetRef.current = target
+      scheduleRef.current = schedule
+      lastPointAtRef.current = Date.now()
+
+      chart.setOption(
+        {
+          series: [{ data: actual }, { data: target }, { data: schedule }],
+        },
+        { notMerge: false, lazyUpdate: true },
+      )
+
+      scheduleYAxisAutorange(chart)
+
+      if (followLiveRef.current && autoLiveWindowRef.current) {
+        applyAutoLiveWindow(chart)
+      }
+
+      seededRef.current = true
+      dbFetchDoneRef.current = true
+      dbFetchPendingRef.current = false
+    }
+
+    run().catch((err) => {
+      // On error, clear state so the backlog-seed effect can take over as fallback.
+      if (!ac.signal.aborted) {
+        console.warn('[LiveTempChart] DB seed failed, falling back to backlog:', err)
+      }
+      dbFetchPendingRef.current = false
+      wsPendingBufferRef.current = []
+    })
+
+    return () => {
+      ac.abort()
+    }
+  }, [props.backlog, maxPoints])
+
+  // Backlog-seed effect: fallback when DB fetch is not attempted or fails.
   useEffect(() => {
     const backlog = props.backlog
     if (!backlog) return
     if (seededRef.current) return
+    if (dbFetchPendingRef.current || dbFetchDoneRef.current) return
     if (!chartRef.current) return
 
     const now = Date.now()
@@ -789,6 +941,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
     // reflect actual wall-clock positions (not assumed 1-second spacing).
     const lastLog = log.length > 0 ? log[log.length - 1] : null
     const runStartMs = lastLog ? now - lastLog.runtime * 1000 : now
+    runStartMsRef.current = runStartMs
 
     const actual: Point[] = []
     const target: Point[] = []
@@ -836,13 +989,24 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const chart = chartRef.current
     if (!oven || !chart) return
 
+    // While the DB fetch is in flight, buffer WS updates instead of applying them.
+    // They'll be drained and deduplicated after the DB seed completes.
+    if (dbFetchPendingRef.current) {
+      wsPendingBufferRef.current.push(oven)
+      return
+    }
+
     const now = Date.now()
     const lastAt = lastPointAtRef.current
     if (lastAt !== null && now - lastAt < 250) return
     lastPointAtRef.current = now
 
-    actualRef.current.push([now, Number.isFinite(oven.temperature) ? oven.temperature : null])
-    targetRef.current.push([now, isTargetAvailable(oven) ? oven.target : null])
+    // Use runtime-based timestamps so live ticks stay on the same time base
+    // as the schedule and DB-seeded data (avoids WS delivery lag offset).
+    const t = runStartMsRef.current + oven.runtime * 1000
+
+    actualRef.current.push([t, Number.isFinite(oven.temperature) ? oven.temperature : null])
+    targetRef.current.push([t, isTargetAvailable(oven) ? oven.target : null])
     clampHistory(actualRef.current, maxPoints)
     clampHistory(targetRef.current, maxPoints)
 

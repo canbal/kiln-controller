@@ -14,6 +14,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsType } from 'echarts/core'
 import { apiGetSession, apiListSessionSamples, apiListSessions } from '../api/sessions'
 import type { Session, SessionSample } from '../contract/sessions'
+import { extractTemp, extractTarget } from '../util/sampleExtract'
 
 echarts.use([
   LineChart,
@@ -147,23 +148,6 @@ function pickMostRecentCompleted(sessions: Session[]): Session | null {
   return byCreated[0] ?? null
 }
 
-function isFiniteNumber(v: unknown): v is number {
-  return typeof v === 'number' && Number.isFinite(v)
-}
-
-function extractTemp(state: unknown): number | null {
-  if (!state || typeof state !== 'object') return null
-  const v = (state as Record<string, unknown>).temperature
-  return isFiniteNumber(v) ? v : null
-}
-
-function extractTarget(state: unknown): number | null {
-  if (!state || typeof state !== 'object') return null
-  const s = (state as Record<string, unknown>).state
-  const v = (state as Record<string, unknown>).target
-  if (s !== 'RUNNING') return null
-  return isFiniteNumber(v) && v > 0 ? v : null
-}
 
 function dedupeByT(samples: SessionSample[]): SessionSample[] {
   const m = new Map<number, SessionSample>()
