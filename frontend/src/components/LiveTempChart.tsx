@@ -37,6 +37,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const unitRef = useRef(unit)
   useEffect(() => { unitRef.current = unit }, [unit])
 
+  const [loading, setLoading] = useState(true)
   const [followLive, setFollowLive] = useState(true)
   const followLiveRef = useRef(true)
   const [autoLiveWindow, setAutoLiveWindow] = useState(true)
@@ -408,6 +409,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
       seededRef.current = true
       dbFetchDoneRef.current = true
       dbFetchPendingRef.current = false
+      setLoading(false)
     }
 
     run().catch((err) => {
@@ -461,6 +463,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     lastPointAtRef.current = now
     seededRef.current = true
+    setLoading(false)
 
     const chart = chartRef.current
     setSeriesData(chart)
@@ -549,8 +552,19 @@ export function LiveTempChart(props: LiveTempChartProps) {
     }
   }, [props.state, maxPoints, scheme])
 
+  // Hide x-axis and slider while loading.
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    chart.setOption(
+      { legend: { show: !loading }, xAxis: { show: !loading }, dataZoom: [{}, { show: !loading }] },
+      { notMerge: false, lazyUpdate: true },
+    )
+  }, [loading])
+
   return (
     <div className="liveChartWrap" aria-label="Live temperature chart">
+      {loading ? <div className="chartLoading">Loading data</div> : null}
       {!followLive || !autoLiveWindow ? (
         <button type="button" className="chartReset" onClick={resetToLive} aria-label="Reset chart to live view">
           Reset Zoom

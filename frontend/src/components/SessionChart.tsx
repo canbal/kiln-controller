@@ -61,6 +61,16 @@ export function SessionChart(props: SessionChartProps) {
     minZoomMs: 10_000,
   })
 
+  // Hide x-axis and slider while loading.
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    chart.setOption(
+      { legend: { show: !loading }, xAxis: { show: !loading }, dataZoom: [{}, { show: !loading }] },
+      { notMerge: false, lazyUpdate: true },
+    )
+  }, [loading])
+
   const resetZoom = () => {
     const chart = chartRef.current
     if (!chart) return
@@ -236,7 +246,6 @@ export function SessionChart(props: SessionChartProps) {
 
   return (
     <div className="recentSession" aria-label="Session chart">
-      {loading ? <p className="muted">Loading session chart&hellip;</p> : null}
       {error ? (
         <p className="muted">
           Session chart error: {error}
@@ -251,6 +260,7 @@ export function SessionChart(props: SessionChartProps) {
       {!loading && !error && !sampleCount ? <p className="muted">No samples available for this session.</p> : null}
 
       <div className="liveChartWrap" aria-label="Session temperature chart">
+        {loading ? <div className="chartLoading">Loading data</div> : null}
         {zoomed ? (
           <button type="button" className="chartReset" onClick={resetZoom} aria-label="Reset chart zoom">
             Reset Zoom
@@ -260,9 +270,6 @@ export function SessionChart(props: SessionChartProps) {
         <div ref={hostRef} className="liveChart sessionChart" />
       </div>
 
-      <p className="muted chartHint">
-        End-of-profile is marked; shaded region indicates the cooldown tail beyond the profile.
-      </p>
       {session && typeof session.ended_at !== 'number' ? (
         <p className="muted">Note: this session has no end timestamp yet; cooldown tail marker is unavailable.</p>
       ) : null}

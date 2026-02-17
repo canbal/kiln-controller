@@ -117,7 +117,7 @@ export function buildBaseOption(
         sampling: 'lttb',
       },
       {
-        name: 'Cooldown tail',
+        name: 'Cooldown',
         type: 'line',
         showSymbol: false,
         itemStyle: { color: scheme.seriesTail },
@@ -159,7 +159,7 @@ export function buildMarkLine(endMs: number, scheme: ChartScheme) {
     lineStyle: { color: scheme.markerLine, width: 2, type: 'solid' as const },
     label: {
       show: true,
-      formatter: 'Profile end',
+      formatter: 'End',
       color: scheme.markerLine,
       fontWeight: 800,
       padding: [2, 6, 2, 6],
@@ -180,7 +180,7 @@ export function buildMarkArea(endMs: number, maxMs: number, scheme: ChartScheme)
       show: true,
       color: scheme.tailLabel,
       fontWeight: 800,
-      formatter: 'Cooldown tail',
+      formatter: 'Cooldown',
       position: 'insideTop' as const,
     },
     data: [[{ xAxis: endMs }, { xAxis: maxMs }]],
