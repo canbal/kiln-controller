@@ -228,12 +228,10 @@ export function LiveTempChart(props: LiveTempChartProps) {
     if (!chartRef.current) return
 
     const lastLog = backlog.log.length > 0 ? backlog.log[backlog.log.length - 1] : null
-    if (!lastLog) return
 
-    // Attempt DB seed when oven is RUNNING, or when IDLE + cooldown_active.
-    const isRunning = lastLog.state === 'RUNNING'
-    const isCooldown = lastLog.state === 'IDLE' && lastLog.cooldown_active === true && typeof lastLog.cooldown_session_id === 'string'
-    if (!isRunning && !isCooldown) return
+    // Attempt DB seed: RUNNING, IDLE + cooldown, or IDLE (show last completed session).
+    const isRunning = lastLog?.state === 'RUNNING'
+    const isCooldown = lastLog?.state === 'IDLE' && lastLog.cooldown_active === true && typeof lastLog.cooldown_session_id === 'string'
 
     const ac = new AbortController()
     dbFetchPendingRef.current = true
@@ -273,16 +271,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
         const target: Point[] = []
         const cooldown: Point[] = []
 
-        const extractRuntime = (state: unknown): number | null => {
-          if (!state || typeof state !== 'object') return null
-          const v = (state as Record<string, unknown>).runtime
-          return typeof v === 'number' && Number.isFinite(v) ? v : null
-        }
-
         for (const s of samples) {
-          const rt = extractRuntime(s.state)
-          const tMs = rt !== null ? runStartMs + rt * 1000 : s.t * 1000
-
+          const tMs = s.t * 1000
           if (typeof endedAt === 'number' && s.t > endedAt) {
             cooldown.push([tMs, extractTemp(s.state)])
           } else {
@@ -306,7 +296,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
         targetRef.current = target
         cooldownRef.current = cooldown
 
-      } else {
+      } else if (isRunning) {
         // Running: standard DB seed.
         const listRes = await apiListSessions({ limit: 5, signal: ac.signal })
         if (!listRes.ok) throw new Error(listRes.error)
@@ -324,17 +314,10 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
         const samples = await fetchAllSessionSamples({ sessionId, from: startedAt, signal: ac.signal })
 
-        const extractRuntime = (state: unknown): number | null => {
-          if (!state || typeof state !== 'object') return null
-          const v = (state as Record<string, unknown>).runtime
-          return typeof v === 'number' && Number.isFinite(v) ? v : null
-        }
-
         const actual: Point[] = []
         const target: Point[] = []
         for (const s of samples) {
-          const rt = extractRuntime(s.state)
-          const tMs = rt !== null ? runStartMs + rt * 1000 : s.t * 1000
+          const tMs = s.t * 1000
           actual.push([tMs, extractTemp(s.state)])
           target.push([tMs, extractTarget(s.state)])
         }
@@ -347,12 +330,12 @@ export function LiveTempChart(props: LiveTempChartProps) {
         }
 
         // Drain the WS pending buffer.
-        const lastDbRuntimeMs = actual.length > 0 ? actual[actual.length - 1][0] : runStartMs
+        const lastDbMs = actual.length > 0 ? actual[actual.length - 1][0] : runStartMs
         const buffered = wsPendingBufferRef.current
         wsPendingBufferRef.current = []
         for (const entry of buffered) {
-          const entryT = runStartMs + entry.runtime * 1000
-          if (entryT <= lastDbRuntimeMs) continue
+          const entryT = runStartMs + (typeof entry.elapsed === 'number' ? entry.elapsed : entry.runtime) * 1000
+          if (entryT <= lastDbMs) continue
           actual.push([entryT, Number.isFinite(entry.temperature) ? entry.temperature : null])
           target.push([entryT, isTargetAvailable(entry) ? entry.target : null])
         }
@@ -360,6 +343,54 @@ export function LiveTempChart(props: LiveTempChartProps) {
         actualRef.current = actual
         targetRef.current = target
         scheduleRef.current = schedule
+
+      } else {
+        // Idle without cooldown: load the most recent completed session.
+        const listRes = await apiListSessions({ limit: 10, signal: ac.signal })
+        if (!listRes.ok) throw new Error(listRes.error)
+        const completed = listRes.value.find((s) => s.outcome === 'COMPLETED' && typeof s.ended_at === 'number')
+          ?? listRes.value.find((s) => typeof s.ended_at === 'number')
+        if (!completed) throw new Error('no_completed_session')
+
+        sessionId = completed.id
+        const detailRes3 = await apiGetSession({ sessionId, signal: ac.signal })
+        if (!detailRes3.ok) throw new Error(detailRes3.error)
+        const session3 = detailRes3.value
+
+        startedAt = session3.started_at ?? session3.created_at
+        const runStartMs = startedAt * 1000
+        runStartMsRef.current = runStartMs
+
+        let schedule: Point[] = []
+        if (session3.schedule && session3.schedule.length > 0) {
+          schedule = session3.schedule.map(([sec, temp]) => [runStartMs + sec * 1000, temp] as Point)
+        }
+        scheduleRef.current = schedule
+
+        const endedAt = session3.ended_at
+        if (typeof endedAt === 'number') {
+          profileEndMsRef.current = endedAt * 1000
+        }
+
+        const samples = await fetchAllSessionSamples({ sessionId, from: startedAt, signal: ac.signal })
+        const actual: Point[] = []
+        const target: Point[] = []
+        const cooldown: Point[] = []
+
+        for (const s of samples) {
+          const tMs = s.t * 1000
+          if (typeof endedAt === 'number' && s.t > endedAt) {
+            cooldown.push([tMs, extractTemp(s.state)])
+          } else {
+            actual.push([tMs, extractTemp(s.state)])
+            target.push([tMs, extractTarget(s.state)])
+          }
+        }
+
+        actualRef.current = actual
+        targetRef.current = target
+        cooldownRef.current = cooldown
+        wsPendingBufferRef.current = []
       }
 
       // Seed the chart.
@@ -401,7 +432,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const now = Date.now()
     const log = backlog.log
     const lastLog = log.length > 0 ? log[log.length - 1] : null
-    const runStartMs = lastLog ? now - lastLog.runtime * 1000 : now
+    const lastElapsed = lastLog && typeof lastLog.elapsed === 'number' ? lastLog.elapsed : lastLog?.runtime ?? 0
+    const runStartMs = lastLog ? now - lastElapsed * 1000 : now
     runStartMsRef.current = runStartMs
 
     const actual: Point[] = []
@@ -409,7 +441,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     for (let i = 0; i < log.length; i++) {
       const oven = log[i]
-      const t = runStartMs + oven.runtime * 1000
+      const t = runStartMs + (typeof oven.elapsed === 'number' ? oven.elapsed : oven.runtime) * 1000
       actual.push([t, Number.isFinite(oven.temperature) ? oven.temperature : null])
       target.push([t, isTargetAvailable(oven) ? oven.target : null])
     }
@@ -470,8 +502,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
     }
 
     if (oven.state === 'RUNNING') {
-      // Normal live tick.
-      const t = runStartMsRef.current + oven.runtime * 1000
+      // Normal live tick — use wall-clock elapsed (not runtime, which pauses on catch-up).
+      const t = runStartMsRef.current + (typeof oven.elapsed === 'number' ? oven.elapsed : oven.runtime) * 1000
       actualRef.current.push([t, Number.isFinite(oven.temperature) ? oven.temperature : null])
       targetRef.current.push([t, isTargetAvailable(oven) ? oven.target : null])
       clampHistory(actualRef.current, maxPoints)
