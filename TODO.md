@@ -572,8 +572,8 @@ Rules:
   - owner: @claude
   - deps: `T-SQ02`
   - acceptance: third "Schedule" series (dotted line) renders on both LiveTempChart and RecentSessionChart without affecting default zoom levels
-  - PR:
-  - commit:
+  - PR: https://github.com/canbal/kiln-controller/pull/49
+  - commit: 34feb0b
 
 ### Milestones 7-10: Later Work (Config, Profile Editing, Decommission)
 
