@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useStatusWs } from './ws/status'
 import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
-import { RecentSessionChart } from './components/RecentSessionChart'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { SessionsListPage } from './pages/SessionsListPage'
 import { appHref, useAppRoute } from './router'
@@ -325,14 +324,6 @@ function App() {
           <p className="muted chartHint">Scroll/2-finger to pan. Pinch (or ctrl+scroll) to zoom. Drag to pan.</p>
         </article>
 
-        <article className="card card--span2" aria-label="Recent session chart">
-          <div className="cardHead">
-            <h2>Most Recent Session</h2>
-            <div className="cardHeadMeta muted">Cooling tail + end marker</div>
-          </div>
-          <RecentSessionChart tempScale={cfg.tempScale} theme={theme} />
-        </article>
-
         <article className="card">
           <h2>What this is</h2>
           <p>
@@ -386,7 +377,7 @@ function App() {
       ) : route.kind === 'sessions' ? (
         <SessionsListPage />
       ) : route.kind === 'session_detail' ? (
-        <SessionDetailPage sessionId={route.sessionId} />
+        <SessionDetailPage sessionId={route.sessionId} tempScale={cfg.tempScale} theme={theme} />
       ) : (
         <section className="sessions" aria-label="Not found">
           <article className="card">

@@ -9,15 +9,10 @@ import { fmtTemp, fmtAxisTime } from '../util/chartFormatting'
 import { schemeForTheme } from '../util/chartTheme'
 import { setupChart, resetYAxisCache } from '../util/chartSetup'
 
-type RecentSessionChartProps = {
+type SessionChartProps = {
+  sessionId?: string
   tempScale: 'f' | 'c' | null
   theme?: 'stoneware' | 'dark'
-}
-
-function fmtDateTime(tsSec: number | null): string {
-  if (tsSec === null) return '--'
-  const d = new Date(tsSec * 1000)
-  return d.toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 function pickMostRecentCompleted(sessions: Session[]): Session | null {
@@ -31,7 +26,7 @@ function pickMostRecentCompleted(sessions: Session[]): Session | null {
   return byCreated[0] ?? null
 }
 
-export function RecentSessionChart(props: RecentSessionChartProps) {
+export function SessionChart(props: SessionChartProps) {
   const theme = props.theme ?? 'stoneware'
   const scheme = useMemo(() => schemeForTheme(theme), [theme])
 
@@ -44,10 +39,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
 
-  // Sample data stored in state for rendering metadata; refs for chart updates.
   const [sampleCount, setSampleCount] = useState(0)
-  const [profileSampleCount, setProfileSampleCount] = useState(0)
-  const [cooldownSampleCount, setCooldownSampleCount] = useState(0)
 
   const seriesDataRef = useRef<[Point[], Point[], Point[], Point[]]>([[], [], [], []])
   const timeExtentMsRef = useRef<{ min: number; max: number } | null>(null)
@@ -275,18 +267,32 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       setError(null)
       setSession(null)
 
-      const sessRes = await apiListSessions({ limit: 10, offset: 0, signal: ac.signal })
-      if (!sessRes.ok) {
-        setError(sessRes.error)
-        setLoading(false)
-        return
-      }
+      let picked: Session | null = null
 
-      const picked = pickMostRecentCompleted(sessRes.value)
-      if (!picked) {
-        setError('No sessions found')
-        setLoading(false)
-        return
+      if (props.sessionId) {
+        // Direct session ID provided — fetch it directly.
+        const detailRes = await apiGetSession({ sessionId: props.sessionId, signal: ac.signal })
+        if (!detailRes.ok) {
+          setError(detailRes.error)
+          setLoading(false)
+          return
+        }
+        picked = detailRes.value
+      } else {
+        // Auto-pick most recent session.
+        const sessRes = await apiListSessions({ limit: 10, offset: 0, signal: ac.signal })
+        if (!sessRes.ok) {
+          setError(sessRes.error)
+          setLoading(false)
+          return
+        }
+
+        picked = pickMostRecentCompleted(sessRes.value)
+        if (!picked) {
+          setError('No sessions found')
+          setLoading(false)
+          return
+        }
       }
 
       setSession(picked)
@@ -310,8 +316,6 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       const actualProfile: Point[] = []
       const actualCooldown: Point[] = []
       const target: Point[] = []
-      let profileCount = 0
-      let cooldownCount = 0
 
       for (const s of samples) {
         const tMs = s.t * 1000
@@ -321,12 +325,10 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
         if (endMs !== null && tMs > endMs) {
           actualCooldown.push([tMs, temp])
           target.push([tMs, null])
-          if (temp !== null) cooldownCount++
         } else {
           actualProfile.push([tMs, temp])
           target.push([tMs, tgt])
           actualCooldown.push([tMs, null])
-          if (temp !== null) profileCount++
         }
       }
 
@@ -344,8 +346,6 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       }
 
       setSampleCount(samples.length)
-      setProfileSampleCount(profileCount)
-      setCooldownSampleCount(cooldownCount)
 
       // Store in refs for chart updates.
       seriesDataRef.current = [actualProfile, actualCooldown, target, schedule]
@@ -443,11 +443,7 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
     })
 
     return () => { ac.abort() }
-  }, [scheme])
-
-  const endedAt = session && typeof session.ended_at === 'number' ? session.ended_at : null
-  const startedAt = session && typeof session.started_at === 'number' ? session.started_at : null
-  const endedState = session?.outcome ?? '--'
+  }, [scheme, props.sessionId])
 
   const endpointHint = useMemo(() => {
     if (!error) return null
@@ -458,37 +454,8 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
   }, [error])
 
   return (
-    <div className="recentSession" aria-label="Most recent session">
-      <div className="recentSessionMeta">
-        <div className="kv compact">
-          <div className="k">Profile</div>
-          <div className="v">{session?.profile_name ?? '--'}</div>
-        </div>
-        <div className="kv compact">
-          <div className="k">Outcome</div>
-          <div className="v">{endedState}</div>
-        </div>
-        <div className="kv compact">
-          <div className="k">Start</div>
-          <div className="v">{fmtDateTime(startedAt)}</div>
-        </div>
-        <div className="kv compact">
-          <div className="k">End</div>
-          <div className="v">{fmtDateTime(endedAt)}</div>
-        </div>
-        <div className="kv compact">
-          <div className="k">Samples</div>
-          <div className="v">
-            {sampleCount ? `${profileSampleCount} profile + ${cooldownSampleCount} tail` : '--'}
-          </div>
-        </div>
-        <div className="kv compact">
-          <div className="k">Unit</div>
-          <div className="v">&deg;{unit || '--'}</div>
-        </div>
-      </div>
-
-      {loading ? <p className="muted">Loading most recent session&hellip;</p> : null}
+    <div className="recentSession" aria-label="Session chart">
+      {loading ? <p className="muted">Loading session chart&hellip;</p> : null}
       {error ? (
         <p className="muted">
           Session chart error: {error}
@@ -520,11 +487,6 @@ export function RecentSessionChart(props: RecentSessionChartProps) {
       ) : null}
       {session && session.outcome !== 'COMPLETED' ? (
         <p className="muted">Note: cooldown tail sampling is only expected for COMPLETED runs.</p>
-      ) : null}
-      {session && !loading && !error ? (
-        <p className="muted">
-          Session id: <code>{session.id}</code>
-        </p>
       ) : null}
     </div>
   )

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { apiGetSession, apiPatchSessionNotes } from '../api/sessions'
 import type { Session } from '../contract/sessions'
 import { appHref } from '../router'
+import { SessionChart } from '../components/SessionChart'
 
 function fmtDateTime(tsSec: number | null | undefined): string {
   if (typeof tsSec !== 'number' || !Number.isFinite(tsSec)) return '--'
@@ -37,7 +38,11 @@ function normalizeNotes(v: string | null): string {
   return v ?? ''
 }
 
-export function SessionDetailPage(props: { sessionId: string }) {
+export function SessionDetailPage(props: {
+  sessionId: string
+  tempScale?: 'f' | 'c' | null
+  theme?: 'stoneware' | 'dark'
+}) {
   const sessionId = props.sessionId
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -188,6 +193,14 @@ export function SessionDetailPage(props: { sessionId: string }) {
                 </div>
               </div>
             </div>
+          </article>
+
+          <article className="card card--span2" aria-label="Session chart">
+            <div className="cardHead">
+              <h2>Temperature Chart</h2>
+              <div className="cardHeadMeta muted">Actual + target + cooldown tail</div>
+            </div>
+            <SessionChart sessionId={sessionId} tempScale={props.tempScale ?? null} theme={props.theme} />
           </article>
 
           <article className="card" aria-label="Session notes">
