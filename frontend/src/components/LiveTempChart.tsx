@@ -144,7 +144,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const targetRef = useRef<Point[]>([])
   const scheduleRef = useRef<Point[]>([])
 
-  const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
+  const maxPoints = 13 * 60 * 60 // 13 hours at 1 Hz (covers longest firings)
   const LIVE_WINDOW_MS = 30 * 60 * 1000
   const MIN_ZOOM_MS = 10 * 1000
 
@@ -810,14 +810,12 @@ export function LiveTempChart(props: LiveTempChartProps) {
       if (!detailRes.ok) throw new Error(detailRes.error)
       const session = detailRes.value
 
-      // 3. Fetch samples with smart pagination: only the most recent `maxPoints` seconds.
-      const nowSec = Math.floor(Date.now() / 1000)
+      // 3. Fetch all samples from session start (paginated in 5000-row chunks).
       const startedAt = session.started_at ?? session.created_at
-      const fromSec = Math.max(startedAt, nowSec - maxPoints)
 
       const PAGE_SIZE = 5000
       const allSamples: { t: number; state: unknown }[] = []
-      let pageFrom = fromSec
+      let pageFrom = startedAt
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const samplesRes = await apiListSessionSamples({
