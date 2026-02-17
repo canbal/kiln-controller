@@ -5,11 +5,10 @@ import { apiListSessions, apiGetSession } from '../api/sessions'
 import { extractTemp, extractTarget } from '../util/sampleExtract'
 import { fetchAllSessionSamples } from '../util/fetchSessionSamples'
 import type { Point } from '../util/chartFormatting'
-import { fmtTemp, fmtAxisTime } from '../util/chartFormatting'
-import type { ChartScheme } from '../util/chartTheme'
 import { schemeForTheme } from '../util/chartTheme'
 import { readZoomWindowValues } from '../util/chartZoom'
-import { setupChart } from '../util/chartSetup'
+import { buildBaseOption, buildMarkLine, buildMarkArea } from '../util/chartOptions'
+import { useChartCore } from '../hooks/useChartCore'
 
 type LiveTempChartProps = {
   state: OvenState | null
@@ -33,20 +32,16 @@ function isTargetAvailable(oven: OvenState | null): boolean {
 export function LiveTempChart(props: LiveTempChartProps) {
   const theme = props.theme ?? 'stoneware'
   const scheme = useMemo(() => schemeForTheme(theme), [theme])
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  const chartRef = useRef<EChartsType | null>(null)
-  const setupRef = useRef<ReturnType<typeof setupChart> | null>(null)
+
+  const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
+  const unitRef = useRef(unit)
+  useEffect(() => { unitRef.current = unit }, [unit])
 
   const [followLive, setFollowLive] = useState(true)
   const followLiveRef = useRef(true)
   const [autoLiveWindow, setAutoLiveWindow] = useState(true)
-  const programmaticZoomRef = useRef(false)
-  const zoomSpanPctRef = useRef(20)
-
   const autoLiveWindowRef = useRef(true)
-
-  const [zoomSpanLabel, setZoomSpanLabel] = useState<string | null>(null)
-  const zoomSpanHideTimerRef = useRef<number | null>(null)
+  const zoomSpanPctRef = useRef(20)
 
   const seededRef = useRef(false)
   const dbFetchPendingRef = useRef(false)
@@ -61,16 +56,9 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const profileEndMsRef = useRef<number | null>(null)
   const prevOvenStateRef = useRef<string | null>(null)
 
-  const maxPoints = 2 * 60 * 60 // 2 hours at 1 Hz
+  const maxPoints = 24 * 60 * 60 // 24 hours at 1 Hz
   const LIVE_WINDOW_MS = 30 * 60 * 1000
   const MIN_ZOOM_MS = 10 * 1000
-
-  const unit = props.tempScale === 'c' ? 'C' : props.tempScale === 'f' ? 'F' : ''
-  const unitRef = useRef(unit)
-
-  useEffect(() => {
-    unitRef.current = unit
-  }, [unit])
 
   // Extent of actual + cooldown data — used for live zoom logic.
   const timeExtent = () => {
@@ -108,20 +96,29 @@ export function LiveTempChart(props: LiveTempChartProps) {
     return { min, max }
   }
 
-  const showZoomSpanHint = () => {
-    const setup = setupRef.current
-    if (!setup) return
-    const label = setup.showZoomSpanHint()
-    if (!label) return
-    setZoomSpanLabel(label)
-    if (zoomSpanHideTimerRef.current !== null) {
-      window.clearTimeout(zoomSpanHideTimerRef.current)
-    }
-    zoomSpanHideTimerRef.current = window.setTimeout(() => {
-      zoomSpanHideTimerRef.current = null
-      setZoomSpanLabel(null)
-    }, 900)
-  }
+  const baseOption = useMemo(
+    () => buildBaseOption(scheme, unitRef, { dataZoomStart: 80, seriesEmphasis: true }),
+    [scheme],
+  )
+
+  const {
+    hostRef, chartRef, setupRef,
+    zoomSpanLabel, showZoomSpanHint, programmaticZoom,
+  } = useChartCore(baseOption, {
+    onManualZoom: () => {
+      autoLiveWindowRef.current = false
+      setAutoLiveWindow(false)
+      followLiveRef.current = false
+      setFollowLive(false)
+      showZoomSpanHint()
+    },
+    getDataExtent: chartDataExtent,
+    getSeriesForYRange: () => ({
+      scan: [actualRef.current, cooldownRef.current, targetRef.current],
+      interpolate: [scheduleRef.current],
+    }),
+    minZoomMs: MIN_ZOOM_MS,
+  })
 
   const readZoomWindowPct = (chart: EChartsType): { startPct: number; endPct: number } | null => {
     const extent = timeExtent()
@@ -136,286 +133,64 @@ export function LiveTempChart(props: LiveTempChartProps) {
   }
 
   const resetToLive = () => {
-    const chart = chartRef.current
     followLiveRef.current = true
     setFollowLive(true)
     setAutoLiveWindow(true)
+    const chart = chartRef.current
     if (!chart) return
 
     zoomSpanPctRef.current = 20
     autoLiveWindowRef.current = true
 
-    programmaticZoomRef.current = true
     const extent = timeExtent()
     if (extent) {
       const span = extent.max - extent.min
       if (span < LIVE_WINDOW_MS) {
-        chart.setOption(
-          {
-            dataZoom: [
-              { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
-              { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
-            ],
-          },
-          { notMerge: false, lazyUpdate: true },
-        )
+        programmaticZoom({
+          dataZoom: [
+            { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
+            { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
+          ],
+        })
       } else {
         const endValue = extent.max
         const startValue = endValue - LIVE_WINDOW_MS
-        chart.setOption(
-          {
-            dataZoom: [
-              { rangeMode: ['value', 'value'], startValue, endValue },
-              { rangeMode: ['value', 'value'], startValue, endValue },
-            ],
-          },
-          { notMerge: false, lazyUpdate: true },
-        )
+        programmaticZoom({
+          dataZoom: [
+            { rangeMode: ['value', 'value'], startValue, endValue },
+            { rangeMode: ['value', 'value'], startValue, endValue },
+          ],
+        })
       }
     } else {
       chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
     }
-    window.setTimeout(() => { programmaticZoomRef.current = false }, 0)
   }
 
-  const applyAutoLiveWindow = (chart: EChartsType) => {
+  const applyAutoLiveWindow = () => {
     const extent = timeExtent()
     if (!extent) return
 
     const span = extent.max - extent.min
     if (span < LIVE_WINDOW_MS) {
-      programmaticZoomRef.current = true
-      chart.setOption(
-        {
-          dataZoom: [
-            { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
-            { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
-          ],
-        },
-        { notMerge: false, lazyUpdate: true },
-      )
-      window.setTimeout(() => { programmaticZoomRef.current = false }, 0)
+      programmaticZoom({
+        dataZoom: [
+          { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
+          { rangeMode: ['value', 'value'], startValue: extent.min, endValue: extent.max },
+        ],
+      })
       return
     }
 
     const endValue = extent.max
     const startValue = endValue - LIVE_WINDOW_MS
-    programmaticZoomRef.current = true
-    chart.setOption(
-      {
-        dataZoom: [
-          { rangeMode: ['value', 'value'], startValue, endValue },
-          { rangeMode: ['value', 'value'], startValue, endValue },
-        ],
-      },
-      { notMerge: false, lazyUpdate: true },
-    )
-    window.setTimeout(() => { programmaticZoomRef.current = false }, 0)
-  }
-
-  const buildMarkLine = (endMs: number, s: ChartScheme) => ({
-    silent: true,
-    symbol: ['none', 'none'],
-    lineStyle: { color: s.markerLine, width: 2, type: 'solid' as const },
-    label: {
-      show: true,
-      formatter: 'Profile end',
-      color: s.markerLine,
-      fontWeight: 800,
-      padding: [2, 6, 2, 6],
-      backgroundColor: s.markerLabelBg,
-      borderColor: s.markerLabelBorder,
-      borderWidth: 1,
-      borderRadius: 8,
-    },
-    data: [{ xAxis: endMs }],
-  })
-
-  const buildMarkArea = (endMs: number, maxMs: number, s: ChartScheme) => ({
-    silent: true,
-    itemStyle: { color: s.tailShade },
-    label: {
-      show: true,
-      color: s.tailLabel,
-      fontWeight: 800,
-      formatter: 'Cooldown tail',
-      position: 'insideTop' as const,
-    },
-    data: [[{ xAxis: endMs }, { xAxis: maxMs }]],
-  })
-
-  const baseOption = useMemo(
-    () => ({
-      animation: false,
-      grid: { left: 58, right: 14, top: 34, bottom: 54 },
-      brush: {
-        toolbox: [],
-        xAxisIndex: 0,
-        brushType: 'lineX',
-        brushMode: 'single',
-        transformable: false,
-        throttleType: 'debounce',
-        throttleDelay: 0,
-        brushStyle: {
-          borderWidth: 1,
-          color: 'rgba(120, 140, 180, 0.15)',
-          borderColor: 'rgba(120, 140, 180, 0.5)',
-        },
-      },
-      legend: {
-        top: 0,
-        left: 0,
-        itemWidth: 10,
-        itemHeight: 10,
-        textStyle: { color: scheme.text, fontSize: 12 },
-      },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'line' },
-        backgroundColor: scheme.tooltipBg,
-        borderColor: scheme.tooltipBorder,
-        textStyle: { color: scheme.textStrong },
-        valueFormatter: (v: unknown) => {
-          const u = unitRef.current
-          return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
-        },
-      },
+    programmaticZoom({
       dataZoom: [
-        {
-          type: 'inside',
-          xAxisIndex: 0,
-          filterMode: 'none',
-          start: 80,
-          end: 100,
-          zoomOnMouseWheel: 'ctrl',
-          moveOnMouseWheel: true,
-        },
-        {
-          type: 'slider',
-          xAxisIndex: 0,
-          start: 80,
-          end: 100,
-          height: 18,
-          bottom: 10,
-          backgroundColor: scheme.zoomBg,
-          borderColor: scheme.zoomBorder,
-          fillerColor: scheme.zoomFill,
-          handleStyle: { color: scheme.zoomHandle, borderColor: scheme.zoomHandleBorder },
-          textStyle: { color: scheme.text },
-          zoomOnMouseWheel: 'ctrl',
-          moveOnMouseWheel: true,
-        },
+        { rangeMode: ['value', 'value'], startValue, endValue },
+        { rangeMode: ['value', 'value'], startValue, endValue },
       ],
-      xAxis: {
-        type: 'time',
-        minInterval: 60_000,
-        axisLabel: {
-          color: scheme.text,
-          formatter: (v: number) => fmtAxisTime(v),
-          hideOverlap: true,
-        },
-        axisLine: { lineStyle: { color: scheme.line } },
-        splitLine: { lineStyle: { color: scheme.grid } },
-      },
-      yAxis: {
-        type: 'value',
-        boundaryGap: ['10%', '10%'],
-        minInterval: 0.5,
-        axisLabel: {
-          color: scheme.text,
-          formatter: (v: number) => {
-            const u = unitRef.current
-            return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
-          },
-        },
-        axisLine: { lineStyle: { color: scheme.line } },
-        splitLine: { lineStyle: { color: scheme.grid } },
-      },
-      series: [
-        {
-          name: 'Actual',
-          type: 'line',
-          showSymbol: false,
-          itemStyle: { color: scheme.seriesActual },
-          lineStyle: { width: 2, color: scheme.seriesActual },
-          emphasis: { focus: 'series' },
-          data: [] as Point[],
-          sampling: 'lttb',
-        },
-        {
-          name: 'Cooldown tail',
-          type: 'line',
-          showSymbol: false,
-          itemStyle: { color: scheme.seriesTail },
-          lineStyle: { width: 2, color: scheme.seriesTail },
-          emphasis: { focus: 'series' },
-          data: [] as Point[],
-          sampling: 'lttb',
-        },
-        {
-          name: 'Target',
-          type: 'line',
-          showSymbol: false,
-          itemStyle: { color: scheme.seriesTarget },
-          lineStyle: { width: 2, type: 'dashed', color: scheme.seriesTarget },
-          emphasis: { focus: 'series' },
-          data: [] as Point[],
-          sampling: 'lttb',
-        },
-        {
-          name: 'Schedule',
-          type: 'line',
-          z: 1,
-          showSymbol: true,
-          symbolSize: 6,
-          symbol: 'circle',
-          itemStyle: { color: scheme.seriesSchedule },
-          lineStyle: { width: 1.5, type: 'dotted', color: scheme.seriesSchedule },
-          emphasis: { focus: 'series' },
-          data: [] as Point[],
-        },
-      ],
-    }),
-    [scheme],
-  )
-
-  // --- Chart init effect ---
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-
-    const onManualZoom = () => {
-      autoLiveWindowRef.current = false
-      setAutoLiveWindow(false)
-      followLiveRef.current = false
-      setFollowLive(false)
-      showZoomSpanHint()
-    }
-
-    const result = setupChart(
-      host,
-      baseOption,
-      {
-        onManualZoom,
-        getDataExtent: chartDataExtent,
-        getSeriesForYRange: () => ({
-          scan: [actualRef.current, cooldownRef.current, targetRef.current],
-          interpolate: [scheduleRef.current],
-        }),
-        minZoomMs: MIN_ZOOM_MS,
-      },
-      programmaticZoomRef,
-    )
-
-    chartRef.current = result.chart
-    setupRef.current = result
-
-    return () => {
-      result.destroy()
-      chartRef.current = null
-      setupRef.current = null
-    }
-  }, [baseOption])
+    })
+  }
 
   // --- Helpers for 4-series setOption ---
   const setSeriesData = (chart: EChartsType) => {
@@ -527,8 +302,6 @@ export function LiveTempChart(props: LiveTempChartProps) {
           }
         }
 
-        clampHistory(actual, maxPoints)
-        clampHistory(target, maxPoints)
         actualRef.current = actual
         targetRef.current = target
         cooldownRef.current = cooldown
@@ -584,8 +357,6 @@ export function LiveTempChart(props: LiveTempChartProps) {
           target.push([entryT, isTargetAvailable(entry) ? entry.target : null])
         }
 
-        clampHistory(actual, maxPoints)
-        clampHistory(target, maxPoints)
         actualRef.current = actual
         targetRef.current = target
         scheduleRef.current = schedule
@@ -600,7 +371,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
       setupRef.current?.scheduleYAxisAutorange()
 
       if (followLiveRef.current && autoLiveWindowRef.current) {
-        applyAutoLiveWindow(chart)
+        applyAutoLiveWindow()
       }
 
       seededRef.current = true
@@ -664,7 +435,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
     setupRef.current?.scheduleYAxisAutorange()
 
     if (followLiveRef.current && autoLiveWindowRef.current) {
-      applyAutoLiveWindow(chart)
+      applyAutoLiveWindow()
     }
   }, [props.backlog, maxPoints, scheme])
 
@@ -720,7 +491,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     if (followLiveRef.current) {
       if (autoLiveWindowRef.current) {
-        applyAutoLiveWindow(chart)
+        applyAutoLiveWindow()
       } else {
         // Preserve current zoom level; pin it to the live edge.
         const win = readZoomWindowPct(chart)
@@ -735,31 +506,16 @@ export function LiveTempChart(props: LiveTempChartProps) {
           const ev = ext.max
           const sv = Math.max(ext.min, ev - spanMs)
 
-          programmaticZoomRef.current = true
-          chart.setOption(
-            {
-              dataZoom: [
-                { rangeMode: ['value', 'value'], startValue: sv, endValue: ev },
-                { rangeMode: ['value', 'value'], startValue: sv, endValue: ev },
-              ],
-            },
-            { notMerge: false, lazyUpdate: true },
-          )
-          window.setTimeout(() => { programmaticZoomRef.current = false }, 0)
+          programmaticZoom({
+            dataZoom: [
+              { rangeMode: ['value', 'value'], startValue: sv, endValue: ev },
+              { rangeMode: ['value', 'value'], startValue: sv, endValue: ev },
+            ],
+          })
         }
       }
     }
   }, [props.state, maxPoints, scheme])
-
-  // --- Cleanup timer ---
-  useEffect(() => {
-    return () => {
-      if (zoomSpanHideTimerRef.current !== null) {
-        window.clearTimeout(zoomSpanHideTimerRef.current)
-        zoomSpanHideTimerRef.current = null
-      }
-    }
-  }, [])
 
   return (
     <div className="liveChartWrap" aria-label="Live temperature chart">
