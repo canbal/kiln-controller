@@ -567,9 +567,9 @@ Rules:
   - PR:
   - commit:
 
-- [ ] `T-SQ03` Show original schedule line on live and past-session charts
-  - status: PLANNED
-  - owner:
+- [x] `T-SQ03` Show original schedule line on live and past-session charts
+  - status: DONE
+  - owner: @claude
   - deps: `T-SQ02`
   - acceptance: third "Schedule" series (dotted line) renders on both LiveTempChart and RecentSessionChart without affecting default zoom levels
   - PR:
