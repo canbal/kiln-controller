@@ -372,6 +372,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
   const seededRef = useRef(false)
   const dbSeededRef = useRef(false)
   const dbFetchPendingRef = useRef(false)
+  const dbFetchDoneRef = useRef(false)
   const dbSamplesRef = useRef(0)
   const scheduleRef = useRef<Array<[number, number]> | null>(null)
 
@@ -411,6 +412,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
 
     const ac = new AbortController()
     dbFetchPendingRef.current = true
+    dbFetchDoneRef.current = false
 
     const run = async () => {
       const listRes = await apiListSessions({ limit: 5, signal: ac.signal })
@@ -446,6 +448,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       })
       .finally(() => {
         dbFetchPendingRef.current = false
+        dbFetchDoneRef.current = true
       })
 
     return () => ac.abort()
@@ -465,6 +468,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       seededRef.current = false
       dbSeededRef.current = false
       dbFetchPendingRef.current = false
+      dbFetchDoneRef.current = false
       dbSamplesRef.current = 0
       scheduleRef.current = null
       setEta(null)
@@ -492,6 +496,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       seededRef.current = false
       dbSeededRef.current = false
       dbFetchPendingRef.current = false
+      dbFetchDoneRef.current = false
       dbSamplesRef.current = 0
       scheduleRef.current = null
     }
@@ -533,6 +538,28 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     const catchingUp = isCatchingUp(oven, tempScale)
     const fullPower = isFullPower(oven)
     const targetDelta = Number.isFinite(target) && Number.isFinite(temp) ? target - temp : null
+
+    const dbReady = dbFetchDoneRef.current
+    if (!dbReady) {
+      setEta(null)
+      setDebug({
+        catchingUp,
+        fullPower,
+        pidOut: pidOutFromOven(oven),
+        targetDelta,
+        samples: samplesRef.current.length,
+        dbSeeded: dbSeededRef.current,
+        dbSamples: dbSamplesRef.current,
+        rateSamples: rateSamplesRef.current.length,
+        fullPowerSinceFit: fullPowerSinceFitRef.current,
+        curveBins: curveRef.current?.temps.length ?? 0,
+        calculating: true,
+        delayS: delayRef.current,
+        lastFitAtMs: lastFitAtRef.current,
+        profilePoints: scheduleRef.current?.length ?? backlog?.profile?.data?.length ?? 0,
+      })
+      return
+    }
 
     if (!catchingUp) {
       const now = Date.now()
