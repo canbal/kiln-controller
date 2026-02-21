@@ -186,7 +186,7 @@ function fitQuadratic(points: Array<{ x: number; y: number }>): { a: number; b: 
 }
 
 function buildCurve(rateSamples: RateSample[], tempScale: TempScale): Curve | null {
-  if (rateSamples.length < 5) return null
+  if (rateSamples.length < 3) return null
 
   const binSize = tempScale === 'c' ? 10 : 25
   const minRate = tempScale === 'c' ? 0.005 : 0.01
@@ -206,7 +206,18 @@ function buildCurve(rateSamples: RateSample[], tempScale: TempScale): Curve | nu
     if (med !== null && med > 0) points.push({ temp, rate: med })
   }
 
-  if (points.length < 3) return null
+  if (points.length < 3) {
+    const rates = rateSamples.map((s) => s.rate).filter((r) => Number.isFinite(r) && r > 0)
+    const flat = median(rates)
+    if (flat === null) return null
+    const minRate = tempScale === 'c' ? 0.005 : 0.01
+    const safeRate = Math.max(minRate, flat)
+    const temps = points.length
+      ? points.map((p) => p.temp)
+      : [rateSamples[0].temp, rateSamples[rateSamples.length - 1].temp].sort((a, b) => a - b)
+    const rateAt = () => safeRate
+    return { temps, rates: temps.map(() => safeRate), minRate, rateAt }
+  }
 
   const fit = fitQuadratic(points.map((p) => ({ x: p.temp, y: p.rate })))
 
