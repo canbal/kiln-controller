@@ -68,7 +68,7 @@ function heatFromOven(oven: OvenState | null): number | null {
   return finiteOrNull(oven?.heat)
 }
 
-function sampleFromState(state: unknown): Sample | null {
+function sampleFromState(state: unknown, elapsedOverride?: number): Sample | null {
   if (!state || typeof state !== 'object') return null
   const rec = state as Record<string, unknown>
   const temp = finiteOrNull(rec.temperature)
@@ -76,7 +76,8 @@ function sampleFromState(state: unknown): Sample | null {
   const runtime = finiteOrNull(rec.runtime)
   const elapsed = finiteOrNull(rec.elapsed)
   if (temp === null || target === null) return null
-  const elapsedS = elapsed ?? runtime
+  const hasOverride = typeof elapsedOverride === 'number' && Number.isFinite(elapsedOverride)
+  const elapsedS = hasOverride ? elapsedOverride : elapsed ?? runtime
   if (elapsedS === null) return null
   const pidOut = typeof rec.pidstats === 'object' && rec.pidstats !== null
     ? finiteOrNull((rec.pidstats as Record<string, unknown>).out)
@@ -427,7 +428,8 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
 
       let added = 0
       for (const s of samples) {
-        const sample = sampleFromState(s.state)
+        const elapsedS = Number.isFinite(s.t) && Number.isFinite(startedAt) ? s.t - startedAt : undefined
+        const sample = sampleFromState(s.state, elapsedS)
         if (!sample) continue
         appendSample(sample)
         added += 1
