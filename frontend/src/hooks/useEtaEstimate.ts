@@ -34,7 +34,7 @@ type UseEtaEstimateOpts = {
 
 const MAX_SAMPLES = 30_000
 const MAX_RATE_SAMPLES = 20_000
-const FULL_POWER_SAMPLE_WINDOW = 30
+const FULL_POWER_SAMPLE_WINDOW = 10
 
 export type EtaDebugInfo = {
   catchingUp: boolean
@@ -460,7 +460,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     if (!catchingUp) {
       delayRef.current = 0
       setEta(remainingS)
-    } else if (fullPowerSinceFitRef.current >= FULL_POWER_SAMPLE_WINDOW) {
+    } else if (
+      fullPowerSinceFitRef.current >= FULL_POWER_SAMPLE_WINDOW ||
+      (curveRef.current === null && rateSamplesRef.current.length >= FULL_POWER_SAMPLE_WINDOW)
+    ) {
       curveRef.current = buildCurve(rateSamplesRef.current, tempScale)
       fullPowerSinceFitRef.current = 0
       lastFitAtRef.current = Date.now()
