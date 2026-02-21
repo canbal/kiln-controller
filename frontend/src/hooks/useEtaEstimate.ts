@@ -69,17 +69,26 @@ function heatFromOven(oven: OvenState | null): number | null {
   return finiteOrNull(oven?.heat)
 }
 
-function sampleFromState(state: unknown, elapsedOverride?: number): Sample | null {
+function sampleFromState(
+  state: unknown,
+  elapsedOverride?: number,
+  schedule?: Array<[number, number]> | null,
+): Sample | null {
   if (!state || typeof state !== 'object') return null
   const rec = state as Record<string, unknown>
   const temp = finiteOrNull(rec.temperature)
-  const target = finiteOrNull(rec.target)
+  let target = finiteOrNull(rec.target)
   const runtime = finiteOrNull(rec.runtime)
   const elapsed = finiteOrNull(rec.elapsed)
-  if (temp === null || target === null) return null
+  if (temp === null) return null
   const hasOverride = typeof elapsedOverride === 'number' && Number.isFinite(elapsedOverride)
   const elapsedS = hasOverride ? elapsedOverride : elapsed ?? runtime
   if (elapsedS === null) return null
+  if ((target === null || !Number.isFinite(target)) && schedule && schedule.length > 0) {
+    const fallback = interpolateTarget(schedule, elapsedS)
+    if (fallback !== null) target = fallback
+  }
+  if (target === null || !Number.isFinite(target)) return null
   const pidOut = typeof rec.pidstats === 'object' && rec.pidstats !== null
     ? finiteOrNull((rec.pidstats as Record<string, unknown>).out)
     : null
@@ -431,9 +440,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       const samples = await fetchAllSessionSamples({ sessionId: active.id, from: startedAt, signal: ac.signal })
 
       let added = 0
+      const schedule = scheduleRef.current
       for (const s of samples) {
         const elapsedS = Number.isFinite(s.t) && Number.isFinite(startedAt) ? s.t - startedAt : undefined
-        const sample = sampleFromState(s.state, elapsedS)
+        const sample = sampleFromState(s.state, elapsedS, schedule)
         if (!sample) continue
         appendSample(sample)
         added += 1
@@ -504,19 +514,11 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     lastRuntimeRef.current = runtime
 
     if (!seededRef.current && backlog?.log?.length) {
+      const schedule = scheduleRef.current ?? backlog.profile?.data ?? null
       for (const entry of backlog.log) {
         const entryElapsed = finiteOrNull((entry as OvenState).elapsed) ?? finiteOrNull(entry.runtime)
-        if (entryElapsed === null) continue
-        const temp = finiteOrNull(entry.temperature)
-        const target = finiteOrNull(entry.target)
-        if (temp === null || target === null) continue
-        const sample: Sample = {
-          elapsedS: entryElapsed,
-          temp,
-          target,
-          pidOut: pidOutFromOven(entry as OvenState),
-          heat: heatFromOven(entry as OvenState),
-        }
+        const sample = sampleFromState(entry, entryElapsed ?? undefined, schedule)
+        if (!sample) continue
         appendSample(sample)
       }
       seededRef.current = true
