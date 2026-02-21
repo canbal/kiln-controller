@@ -448,12 +448,34 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
 
       let added = 0
       const schedule = scheduleRef.current
+      let prevDb: { t: number; sample: Sample } | null = null
       for (const s of samples) {
         const elapsedS = Number.isFinite(s.t) && Number.isFinite(startedAt) ? s.t - startedAt : undefined
         const sample = sampleFromState(s.state, elapsedS, schedule)
         if (!sample) continue
         appendSample(sample, { assumeFullPowerIfUnknown: true })
         added += 1
+
+        if (prevDb) {
+          const dt = s.t - prevDb.t
+          const dT = sample.temp - prevDb.sample.temp
+          if (
+            dt >= 0.5 &&
+            dt <= 5 &&
+            dT > 0 &&
+            isTrailingSample(sample, tempScale) &&
+            isFullPowerSample(sample, true)
+          ) {
+            const rate = dT / dt
+            if (Number.isFinite(rate) && rate > 0) {
+              rateSamplesRef.current.push({ temp: (sample.temp + prevDb.sample.temp) / 2, rate })
+              if (rateSamplesRef.current.length > MAX_RATE_SAMPLES) {
+                rateSamplesRef.current.splice(0, rateSamplesRef.current.length - MAX_RATE_SAMPLES)
+              }
+            }
+          }
+        }
+        prevDb = { t: s.t, sample }
       }
       dbSamplesRef.current = added
       dbSeededRef.current = true
