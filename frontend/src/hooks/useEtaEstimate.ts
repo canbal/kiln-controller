@@ -107,9 +107,9 @@ function isFullPower(oven: OvenState | null): boolean {
   return false
 }
 
-function isFullPowerSample(sample: Sample): boolean {
+function isFullPowerSample(sample: Sample, assumeIfUnknown = false): boolean {
   if (sample.pidOut !== null) return sample.pidOut >= 0.95
-  if (sample.heat === null) return false
+  if (sample.heat === null) return assumeIfUnknown
   if (sample.heat >= 0 && sample.heat <= 1.2) return sample.heat >= 0.95
   if (sample.heat > 1.2 && sample.heat <= 100) return sample.heat >= 95
   return false
@@ -391,7 +391,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     return Math.max(0, totalS - runtimeS)
   }, [runtimeS, totalS])
 
-  const appendSample = (sample: Sample) => {
+  const appendSample = (sample: Sample, opts?: { assumeFullPowerIfUnknown?: boolean }) => {
     const prev = samplesRef.current[samplesRef.current.length - 1]
     if (prev && sample.elapsedS <= prev.elapsedS + 0.1) return
 
@@ -403,7 +403,14 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     if (!prev) return
     const dt = sample.elapsedS - prev.elapsedS
     const dT = sample.temp - prev.temp
-    if (dt >= 0.5 && dt <= 5 && dT > 0 && isFullPowerSample(sample) && isTrailingSample(sample, tempScale)) {
+    const assumeFullPowerIfUnknown = opts?.assumeFullPowerIfUnknown ?? false
+    if (
+      dt >= 0.5 &&
+      dt <= 5 &&
+      dT > 0 &&
+      isFullPowerSample(sample, assumeFullPowerIfUnknown) &&
+      isTrailingSample(sample, tempScale)
+    ) {
       const rate = dT / dt
       if (Number.isFinite(rate) && rate > 0) {
         rateSamplesRef.current.push({ temp: (sample.temp + prev.temp) / 2, rate })
@@ -445,7 +452,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         const elapsedS = Number.isFinite(s.t) && Number.isFinite(startedAt) ? s.t - startedAt : undefined
         const sample = sampleFromState(s.state, elapsedS, schedule)
         if (!sample) continue
-        appendSample(sample)
+        appendSample(sample, { assumeFullPowerIfUnknown: true })
         added += 1
       }
       dbSamplesRef.current = added
@@ -519,7 +526,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         const entryElapsed = finiteOrNull((entry as OvenState).elapsed) ?? finiteOrNull(entry.runtime)
         const sample = sampleFromState(entry, entryElapsed ?? undefined, schedule)
         if (!sample) continue
-        appendSample(sample)
+        appendSample(sample, { assumeFullPowerIfUnknown: true })
       }
       seededRef.current = true
     }
