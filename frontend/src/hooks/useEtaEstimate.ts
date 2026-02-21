@@ -450,6 +450,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       const startedAt = session.started_at ?? session.created_at
       const samples = await fetchAllSessionSamples({ sessionId: active.id, from: startedAt, signal: ac.signal })
 
+      // DB seed should be authoritative on first load.
+      samplesRef.current = []
+      rateSamplesRef.current = []
+      fullPowerSinceFitRef.current = 0
       let added = 0
       const schedule = scheduleRef.current
       let prevDb: { t: number; sample: Sample } | null = null
