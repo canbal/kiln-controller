@@ -34,6 +34,21 @@ type UseEtaEstimateOpts = {
 
 const MAX_SAMPLES = 30_000
 const MAX_RATE_SAMPLES = 20_000
+const FULL_POWER_SAMPLE_WINDOW = 30
+
+export type EtaDebugInfo = {
+  catchingUp: boolean
+  fullPower: boolean
+  pidOut: number | null
+  targetDelta: number | null
+  samples: number
+  rateSamples: number
+  fullPowerSinceFit: number
+  curveBins: number
+  delayS: number
+  lastFitAtMs: number | null
+  profilePoints: number
+}
 
 function finiteOrNull(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -306,15 +321,17 @@ function isCatchingUp(oven: OvenState | null, tempScale: TempScale): boolean {
   return delta > (tempScale === 'c' ? 3 : 5)
 }
 
-export function useEtaEstimate(opts: UseEtaEstimateOpts): number | null {
+export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; debug: EtaDebugInfo | null } {
   const { oven, backlog, runtimeS, elapsedS, totalS, tempScale } = opts
   const [eta, setEta] = useState<number | null>(null)
+  const [debug, setDebug] = useState<EtaDebugInfo | null>(null)
 
   const samplesRef = useRef<Sample[]>([])
   const rateSamplesRef = useRef<RateSample[]>([])
   const fullPowerSinceFitRef = useRef(0)
   const curveRef = useRef<Curve | null>(null)
   const delayRef = useRef(0)
+  const lastFitAtRef = useRef<number | null>(null)
   const lastProfileRef = useRef<string | null>(null)
   const lastRuntimeRef = useRef<number | null>(null)
   const seededRef = useRef(false)
@@ -332,10 +349,12 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): number | null {
       fullPowerSinceFitRef.current = 0
       curveRef.current = null
       delayRef.current = 0
+      lastFitAtRef.current = null
       lastProfileRef.current = null
       lastRuntimeRef.current = null
       seededRef.current = false
       setEta(null)
+      setDebug(null)
       return
     }
 
@@ -354,6 +373,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): number | null {
       fullPowerSinceFitRef.current = 0
       curveRef.current = null
       delayRef.current = 0
+      lastFitAtRef.current = null
       seededRef.current = false
     }
     lastProfileRef.current = profileName
@@ -434,16 +454,16 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): number | null {
     }
 
     const catchingUp = isCatchingUp(oven, tempScale)
+    const fullPower = isFullPower(oven)
+    const targetDelta = Number.isFinite(target) && Number.isFinite(temp) ? target - temp : null
 
     if (!catchingUp) {
       delayRef.current = 0
       setEta(remainingS)
-      return
-    }
-
-    if (fullPowerSinceFitRef.current >= 30) {
+    } else if (fullPowerSinceFitRef.current >= FULL_POWER_SAMPLE_WINDOW) {
       curveRef.current = buildCurve(rateSamplesRef.current, tempScale)
       fullPowerSinceFitRef.current = 0
+      lastFitAtRef.current = Date.now()
       if (curveRef.current && backlog?.profile?.data && runtimeS !== null && Number.isFinite(runtimeS)) {
         delayRef.current = computeCatchUpDelay({
           profile: backlog.profile.data,
@@ -460,7 +480,21 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): number | null {
     } else {
       setEta(null)
     }
+
+    setDebug({
+      catchingUp,
+      fullPower,
+      pidOut: pidOutFromOven(oven),
+      targetDelta,
+      samples: samplesRef.current.length,
+      rateSamples: rateSamplesRef.current.length,
+      fullPowerSinceFit: fullPowerSinceFitRef.current,
+      curveBins: curveRef.current?.temps.length ?? 0,
+      delayS: delayRef.current,
+      lastFitAtMs: lastFitAtRef.current,
+      profilePoints: backlog?.profile?.data?.length ?? 0,
+    })
   }, [oven, backlog, runtimeS, elapsedS, remainingS, tempScale])
 
-  return eta
+  return { eta, debug }
 }

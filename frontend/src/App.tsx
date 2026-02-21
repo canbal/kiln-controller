@@ -62,6 +62,20 @@ function formatDurationSeconds(v: number | null | undefined): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+function formatBool(v: boolean | null | undefined): string {
+  if (v === null || v === undefined) return '--'
+  return v ? 'Yes' : 'No'
+}
+
+function formatSinceMs(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined) return '--'
+  const age = Date.now() - ms
+  if (!Number.isFinite(age) || age < 0) return '--'
+  if (age < 60_000) return `${Math.round(age / 1000)}s`
+  if (age < 3_600_000) return `${Math.round(age / 60_000)}m`
+  return `${Math.round(age / 3_600_000)}h`
+}
+
 function computeProgressPct(runtimeS: number | null, totalS: number | null): number | null {
   if (runtimeS === null || totalS === null) return null
   if (!Number.isFinite(runtimeS) || !Number.isFinite(totalS)) return null
@@ -144,7 +158,7 @@ function App() {
   const totalS = oven && Number.isFinite(oven.totaltime) ? oven.totaltime : null
   const progressPct = running ? computeProgressPct(runtimeS, totalS) : null
   const remainingS = running && runtimeS !== null && totalS !== null ? Math.max(0, totalS - runtimeS) : null
-  const estRemainingS = useEtaEstimate({
+  const { eta: estRemainingS, debug: etaDebug } = useEtaEstimate({
     oven,
     backlog: status.backlog,
     runtimeS,
@@ -319,6 +333,68 @@ function App() {
             </div>
           </div>
         </article>
+
+        {running ? (
+          <article className="card card--span2" aria-label="ETA Debug">
+            <h2>ETA Debug</h2>
+            <div className="metricsTiles" aria-label="ETA debug metrics">
+              <div className="tile">
+                <div className="tileLabel">Catching Up</div>
+                <div className="tileValue tileValue--text">{formatBool(etaDebug?.catchingUp)}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Full Power</div>
+                <div className="tileValue tileValue--text">{formatBool(etaDebug?.fullPower)}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">PID Out</div>
+                <div className="tileValue">
+                  {etaDebug?.pidOut === null || etaDebug?.pidOut === undefined
+                    ? '--'
+                    : `${Math.round(etaDebug.pidOut * 100)}%`}
+                </div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Target Delta</div>
+                <div className="tileValue">
+                  {etaDebug?.targetDelta === null || etaDebug?.targetDelta === undefined
+                    ? '--'
+                    : `${etaDebug.targetDelta.toFixed(1)}°${unit}`}
+                </div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Samples</div>
+                <div className="tileValue">{etaDebug ? etaDebug.samples : '--'}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Rate Samples</div>
+                <div className="tileValue">{etaDebug ? etaDebug.rateSamples : '--'}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Since Fit</div>
+                <div className="tileValue">{etaDebug ? etaDebug.fullPowerSinceFit : '--'}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Curve Bins</div>
+                <div className="tileValue">{etaDebug ? etaDebug.curveBins : '--'}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Delay</div>
+                <div className="tileValue tileValue--mono">
+                  {formatDurationSeconds(etaDebug?.delayS ?? null)}
+                </div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Last Fit</div>
+                <div className="tileValue">{formatSinceMs(etaDebug?.lastFitAtMs)}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Profile Pts</div>
+                <div className="tileValue">{etaDebug ? etaDebug.profilePoints : '--'}</div>
+              </div>
+            </div>
+          </article>
+        ) : null}
 
         <article className="card card--span2" aria-label="Chart">
           <h2>Live Temperature</h2>
