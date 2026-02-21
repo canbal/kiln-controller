@@ -367,6 +367,14 @@ function App() {
                 <div className="tileValue">{etaDebug ? etaDebug.samples : '--'}</div>
               </div>
               <div className="tile">
+                <div className="tileLabel">DB Seeded</div>
+                <div className="tileValue tileValue--text">{formatBool(etaDebug?.dbSeeded)}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">DB Samples</div>
+                <div className="tileValue">{etaDebug ? etaDebug.dbSamples : '--'}</div>
+              </div>
+              <div className="tile">
                 <div className="tileLabel">Rate Samples</div>
                 <div className="tileValue">{etaDebug ? etaDebug.rateSamples : '--'}</div>
               </div>

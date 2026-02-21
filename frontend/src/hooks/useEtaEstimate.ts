@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OvenState, StatusBacklogEnvelope } from '../contract/status'
+import { apiGetSession, apiListSessions } from '../api/sessions'
+import { fetchAllSessionSamples } from '../util/fetchSessionSamples'
 
 type TempScale = 'f' | 'c' | null
 
@@ -42,6 +44,8 @@ export type EtaDebugInfo = {
   pidOut: number | null
   targetDelta: number | null
   samples: number
+  dbSeeded: boolean
+  dbSamples: number
   rateSamples: number
   fullPowerSinceFit: number
   curveBins: number
@@ -62,6 +66,23 @@ function pidOutFromOven(oven: OvenState | null): number | null {
 
 function heatFromOven(oven: OvenState | null): number | null {
   return finiteOrNull(oven?.heat)
+}
+
+function sampleFromState(state: unknown): Sample | null {
+  if (!state || typeof state !== 'object') return null
+  const rec = state as Record<string, unknown>
+  const temp = finiteOrNull(rec.temperature)
+  const target = finiteOrNull(rec.target)
+  const runtime = finiteOrNull(rec.runtime)
+  const elapsed = finiteOrNull(rec.elapsed)
+  if (temp === null || target === null) return null
+  const elapsedS = elapsed ?? runtime
+  if (elapsedS === null) return null
+  const pidOut = typeof rec.pidstats === 'object' && rec.pidstats !== null
+    ? finiteOrNull((rec.pidstats as Record<string, unknown>).out)
+    : null
+  const heat = finiteOrNull(rec.heat)
+  return { elapsedS, temp, target, pidOut, heat }
 }
 
 function isFullPower(oven: OvenState | null): boolean {
@@ -335,12 +356,85 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
   const lastProfileRef = useRef<string | null>(null)
   const lastRuntimeRef = useRef<number | null>(null)
   const seededRef = useRef(false)
+  const dbSeededRef = useRef(false)
+  const dbFetchPendingRef = useRef(false)
+  const dbSamplesRef = useRef(0)
+  const scheduleRef = useRef<Array<[number, number]> | null>(null)
 
   const remainingS = useMemo(() => {
     if (runtimeS === null || totalS === null) return null
     if (!Number.isFinite(runtimeS) || !Number.isFinite(totalS)) return null
     return Math.max(0, totalS - runtimeS)
   }, [runtimeS, totalS])
+
+  const appendSample = (sample: Sample) => {
+    const prev = samplesRef.current[samplesRef.current.length - 1]
+    if (prev && sample.elapsedS <= prev.elapsedS + 0.1) return
+
+    samplesRef.current.push(sample)
+    if (samplesRef.current.length > MAX_SAMPLES) {
+      samplesRef.current.splice(0, samplesRef.current.length - MAX_SAMPLES)
+    }
+
+    if (!prev) return
+    const dt = sample.elapsedS - prev.elapsedS
+    const dT = sample.temp - prev.temp
+    if (dt >= 0.5 && dt <= 5 && dT > 0 && isFullPowerSample(sample) && isTrailingSample(sample, tempScale)) {
+      const rate = dT / dt
+      if (Number.isFinite(rate) && rate > 0) {
+        rateSamplesRef.current.push({ temp: (sample.temp + prev.temp) / 2, rate })
+        if (rateSamplesRef.current.length > MAX_RATE_SAMPLES) {
+          rateSamplesRef.current.splice(0, rateSamplesRef.current.length - MAX_RATE_SAMPLES)
+        }
+        fullPowerSinceFitRef.current += 1
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!oven || oven.state !== 'RUNNING') return
+    if (dbSeededRef.current || dbFetchPendingRef.current) return
+
+    const ac = new AbortController()
+    dbFetchPendingRef.current = true
+
+    const run = async () => {
+      const listRes = await apiListSessions({ limit: 5, signal: ac.signal })
+      if (!listRes.ok) throw new Error(listRes.error)
+      const active = listRes.value.find((s) => s.ended_at === null)
+      if (!active) throw new Error('no_active_session')
+
+      const detailRes = await apiGetSession({ sessionId: active.id, signal: ac.signal })
+      if (!detailRes.ok) throw new Error(detailRes.error)
+      const session = detailRes.value
+
+      scheduleRef.current =
+        session.schedule && session.schedule.length > 0 ? session.schedule : backlog?.profile?.data ?? null
+
+      const startedAt = session.started_at ?? session.created_at
+      const samples = await fetchAllSessionSamples({ sessionId: active.id, from: startedAt, signal: ac.signal })
+
+      let added = 0
+      for (const s of samples) {
+        const sample = sampleFromState(s.state)
+        if (!sample) continue
+        appendSample(sample)
+        added += 1
+      }
+      dbSamplesRef.current = added
+      dbSeededRef.current = true
+    }
+
+    run()
+      .catch(() => {
+        // ignore DB seed errors; fallback to backlog/live.
+      })
+      .finally(() => {
+        dbFetchPendingRef.current = false
+      })
+
+    return () => ac.abort()
+  }, [oven, backlog, tempScale])
 
   useEffect(() => {
     if (!oven || oven.state !== 'RUNNING') {
@@ -353,6 +447,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       lastProfileRef.current = null
       lastRuntimeRef.current = null
       seededRef.current = false
+      dbSeededRef.current = false
+      dbFetchPendingRef.current = false
+      dbSamplesRef.current = 0
+      scheduleRef.current = null
       setEta(null)
       setDebug(null)
       return
@@ -375,6 +473,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       delayRef.current = 0
       lastFitAtRef.current = null
       seededRef.current = false
+      dbSeededRef.current = false
+      dbFetchPendingRef.current = false
+      dbSamplesRef.current = 0
+      scheduleRef.current = null
     }
     lastProfileRef.current = profileName
     lastRuntimeRef.current = runtime
@@ -393,27 +495,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
           pidOut: pidOutFromOven(entry as OvenState),
           heat: heatFromOven(entry as OvenState),
         }
-        const prev = samplesRef.current[samplesRef.current.length - 1]
-        if (!prev || sample.elapsedS > prev.elapsedS + 0.1) {
-          samplesRef.current.push(sample)
-          if (samplesRef.current.length > MAX_SAMPLES) {
-            samplesRef.current.splice(0, samplesRef.current.length - MAX_SAMPLES)
-          }
-          if (prev) {
-            const dt = sample.elapsedS - prev.elapsedS
-            const dT = sample.temp - prev.temp
-            if (dt >= 0.5 && dt <= 5 && dT > 0 && isFullPowerSample(sample) && isTrailingSample(sample, tempScale)) {
-              const rate = dT / dt
-              if (Number.isFinite(rate) && rate > 0) {
-                rateSamplesRef.current.push({ temp: (sample.temp + prev.temp) / 2, rate })
-                if (rateSamplesRef.current.length > MAX_RATE_SAMPLES) {
-                  rateSamplesRef.current.splice(0, rateSamplesRef.current.length - MAX_RATE_SAMPLES)
-                }
-                fullPowerSinceFitRef.current += 1
-              }
-            }
-          }
-        }
+        appendSample(sample)
       }
       seededRef.current = true
     }
@@ -429,29 +511,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       pidOut: pidOutFromOven(oven),
       heat: heatFromOven(oven),
     }
-
-    const prev = samplesRef.current[samplesRef.current.length - 1]
-    if (!prev || sample.elapsedS > prev.elapsedS + 0.1) {
-      samplesRef.current.push(sample)
-      if (samplesRef.current.length > MAX_SAMPLES) {
-        samplesRef.current.splice(0, samplesRef.current.length - MAX_SAMPLES)
-      }
-
-      if (prev) {
-        const dt = sample.elapsedS - prev.elapsedS
-        const dT = sample.temp - prev.temp
-        if (dt >= 0.5 && dt <= 5 && dT > 0 && isFullPowerSample(sample) && isTrailingSample(sample, tempScale)) {
-          const rate = dT / dt
-          if (Number.isFinite(rate) && rate > 0) {
-            rateSamplesRef.current.push({ temp: (sample.temp + prev.temp) / 2, rate })
-            if (rateSamplesRef.current.length > MAX_RATE_SAMPLES) {
-              rateSamplesRef.current.splice(0, rateSamplesRef.current.length - MAX_RATE_SAMPLES)
-            }
-            fullPowerSinceFitRef.current += 1
-          }
-        }
-      }
-    }
+    appendSample(sample)
 
     const catchingUp = isCatchingUp(oven, tempScale)
     const fullPower = isFullPower(oven)
@@ -467,9 +527,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       curveRef.current = buildCurve(rateSamplesRef.current, tempScale)
       fullPowerSinceFitRef.current = 0
       lastFitAtRef.current = Date.now()
-      if (curveRef.current && backlog?.profile?.data && runtimeS !== null && Number.isFinite(runtimeS)) {
+      const schedule = scheduleRef.current ?? backlog?.profile?.data ?? null
+      if (curveRef.current && schedule && runtimeS !== null && Number.isFinite(runtimeS)) {
         delayRef.current = computeCatchUpDelay({
-          profile: backlog.profile.data,
+          profile: schedule,
           runtimeS,
           currentTemp: temp,
           curve: curveRef.current,
@@ -490,12 +551,14 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       pidOut: pidOutFromOven(oven),
       targetDelta,
       samples: samplesRef.current.length,
+      dbSeeded: dbSeededRef.current,
+      dbSamples: dbSamplesRef.current,
       rateSamples: rateSamplesRef.current.length,
       fullPowerSinceFit: fullPowerSinceFitRef.current,
       curveBins: curveRef.current?.temps.length ?? 0,
       delayS: delayRef.current,
       lastFitAtMs: lastFitAtRef.current,
-      profilePoints: backlog?.profile?.data?.length ?? 0,
+      profilePoints: scheduleRef.current?.length ?? backlog?.profile?.data?.length ?? 0,
     })
   }, [oven, backlog, runtimeS, elapsedS, remainingS, tempScale])
 
