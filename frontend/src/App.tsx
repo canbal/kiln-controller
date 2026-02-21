@@ -300,7 +300,9 @@ function App() {
 
             <div className="tile">
               <div className="tileLabel">Est remaining</div>
-              <div className="tileValue tileValue--mono">{formatDurationSeconds(estRemainingS)}</div>
+              <div className="tileValue tileValue--mono">
+                {etaDebug?.calculating ? 'Calculating…' : formatDurationSeconds(estRemainingS)}
+              </div>
             </div>
 
             <div className="tile">

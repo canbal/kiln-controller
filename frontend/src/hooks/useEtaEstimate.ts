@@ -49,6 +49,7 @@ export type EtaDebugInfo = {
   rateSamples: number
   fullPowerSinceFit: number
   curveBins: number
+  calculating: boolean
   delayS: number
   lastFitAtMs: number | null
   profilePoints: number
@@ -569,6 +570,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       setEta(null)
     }
 
+    const calculating =
+      catchingUp &&
+      (curveRef.current === null || (delayRef.current === 0 && rateSamplesRef.current.length < FULL_POWER_SAMPLE_WINDOW))
+
     setDebug({
       catchingUp,
       fullPower,
@@ -580,6 +585,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       rateSamples: rateSamplesRef.current.length,
       fullPowerSinceFit: fullPowerSinceFitRef.current,
       curveBins: curveRef.current?.temps.length ?? 0,
+      calculating,
       delayS: delayRef.current,
       lastFitAtMs: lastFitAtRef.current,
       profilePoints: scheduleRef.current?.length ?? backlog?.profile?.data?.length ?? 0,
