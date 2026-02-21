@@ -391,7 +391,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     return Math.max(0, totalS - runtimeS)
   }, [runtimeS, totalS])
 
-  const appendSample = (sample: Sample, opts?: { assumeFullPowerIfUnknown?: boolean }) => {
+  const appendSample = (
+    sample: Sample,
+    opts?: { assumeFullPowerIfUnknown?: boolean; skipRateSample?: boolean },
+  ) => {
     const prev = samplesRef.current[samplesRef.current.length - 1]
     if (prev && sample.elapsedS <= prev.elapsedS + 0.1) return
 
@@ -401,6 +404,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     }
 
     if (!prev) return
+    if (opts?.skipRateSample) return
     const dt = sample.elapsedS - prev.elapsedS
     const dT = sample.temp - prev.temp
     const assumeFullPowerIfUnknown = opts?.assumeFullPowerIfUnknown ?? false
@@ -453,7 +457,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         const elapsedS = Number.isFinite(s.t) && Number.isFinite(startedAt) ? s.t - startedAt : undefined
         const sample = sampleFromState(s.state, elapsedS, schedule)
         if (!sample) continue
-        appendSample(sample, { assumeFullPowerIfUnknown: true })
+        appendSample(sample, { assumeFullPowerIfUnknown: true, skipRateSample: true })
         added += 1
 
         if (prevDb) {
