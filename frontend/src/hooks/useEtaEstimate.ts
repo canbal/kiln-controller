@@ -365,6 +365,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
   const curveRef = useRef<Curve | null>(null)
   const delayRef = useRef(0)
   const lastFitAtRef = useRef<number | null>(null)
+  const lastCatchUpAtRef = useRef<number | null>(null)
   const lastProfileRef = useRef<string | null>(null)
   const lastRuntimeRef = useRef<number | null>(null)
   const seededRef = useRef(false)
@@ -457,6 +458,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       curveRef.current = null
       delayRef.current = 0
       lastFitAtRef.current = null
+      lastCatchUpAtRef.current = null
       lastProfileRef.current = null
       lastRuntimeRef.current = null
       seededRef.current = false
@@ -485,6 +487,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       curveRef.current = null
       delayRef.current = 0
       lastFitAtRef.current = null
+      lastCatchUpAtRef.current = null
       seededRef.current = false
       dbSeededRef.current = false
       dbFetchPendingRef.current = false
@@ -531,12 +534,20 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     const targetDelta = Number.isFinite(target) && Number.isFinite(temp) ? target - temp : null
 
     if (!catchingUp) {
-      delayRef.current = 0
+      const now = Date.now()
+      if (lastCatchUpAtRef.current === null) {
+        lastCatchUpAtRef.current = now
+      }
+      // Only reset delay after we've been on-schedule for a while.
+      if (now - lastCatchUpAtRef.current > 120_000) {
+        delayRef.current = 0
+      }
       setEta(remainingS)
     } else if (
       fullPowerSinceFitRef.current >= FULL_POWER_SAMPLE_WINDOW ||
       (curveRef.current === null && rateSamplesRef.current.length >= FULL_POWER_SAMPLE_WINDOW)
     ) {
+      lastCatchUpAtRef.current = Date.now()
       curveRef.current = buildCurve(rateSamplesRef.current, tempScale)
       fullPowerSinceFitRef.current = 0
       lastFitAtRef.current = Date.now()
