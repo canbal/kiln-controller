@@ -76,6 +76,26 @@ function formatSinceMs(ms: number | null | undefined): string {
   return `${Math.round(age / 3_600_000)}h`
 }
 
+function formatFitK(v: number | null | undefined): string {
+  if (v === null || v === undefined) return '--'
+  if (!Number.isFinite(v) || v <= 0) return '--'
+  if (v >= 0.01) return `${v.toFixed(4)} /s`
+  return `${v.toExponential(2)} /s`
+}
+
+function formatFitAsymptote(v: number | null | undefined, unit: string): string {
+  if (v === null || v === undefined) return '--'
+  if (!Number.isFinite(v)) return '--'
+  return `${v.toFixed(1)}°${unit}`
+}
+
+function formatFitMode(v: 'exp' | 'flat' | 'none' | null | undefined): string {
+  if (v === null || v === undefined) return '--'
+  if (v === 'exp') return 'Exp'
+  if (v === 'flat') return 'Flat'
+  return 'None'
+}
+
 function computeProgressPct(runtimeS: number | null, totalS: number | null): number | null {
   if (runtimeS === null || totalS === null) return null
   if (!Number.isFinite(runtimeS) || !Number.isFinite(totalS)) return null
@@ -387,6 +407,18 @@ function App() {
               <div className="tile">
                 <div className="tileLabel">Curve Bins</div>
                 <div className="tileValue">{etaDebug ? etaDebug.curveBins : '--'}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Fit k</div>
+                <div className="tileValue">{formatFitK(etaDebug?.fitK)}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Asymptote</div>
+                <div className="tileValue">{formatFitAsymptote(etaDebug?.fitAsymptote, unit)}</div>
+              </div>
+              <div className="tile">
+                <div className="tileLabel">Fit Mode</div>
+                <div className="tileValue tileValue--text">{formatFitMode(etaDebug?.fitMode)}</div>
               </div>
               <div className="tile">
                 <div className="tileLabel">Delay</div>

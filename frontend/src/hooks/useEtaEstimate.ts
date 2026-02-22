@@ -22,7 +22,10 @@ type Curve = {
   temps: number[]
   rates: number[]
   minRate: number
+  k: number | null
+  tInf: number | null
   rateAt: (temp: number) => number
+  timeToHeat: (fromTemp: number, toTemp: number) => number
 }
 
 type UseEtaEstimateOpts = {
@@ -37,6 +40,7 @@ type UseEtaEstimateOpts = {
 const MAX_SAMPLES = 30_000
 const MAX_RATE_SAMPLES = 20_000
 const FULL_POWER_SAMPLE_WINDOW = 10
+const KS818_MAX_TEMP_F = 2350
 
 export type EtaDebugInfo = {
   catchingUp: boolean
@@ -53,6 +57,9 @@ export type EtaDebugInfo = {
   delayS: number
   lastFitAtMs: number | null
   profilePoints: number
+  fitK: number | null
+  fitAsymptote: number | null
+  fitMode: 'exp' | 'flat' | 'none'
 }
 
 function finiteOrNull(v: unknown): number | null {
@@ -120,6 +127,26 @@ function isTrailingSample(sample: Sample, tempScale: TempScale): boolean {
   return delta > (tempScale === 'c' ? 3 : 5)
 }
 
+function isFallingBehindSample(sample: Sample, tempScale: TempScale): boolean {
+  return isTrailingSample(sample, tempScale)
+}
+
+function shouldUseRatePair(opts: {
+  prev: Sample
+  next: Sample
+  tempScale: TempScale
+  assumeFullPowerIfUnknown: boolean
+}): boolean {
+  const { prev, next, tempScale, assumeFullPowerIfUnknown } = opts
+  const dt = next.elapsedS - prev.elapsedS
+  const dT = next.temp - prev.temp
+  if (!(dt >= 0.5 && dt <= 5 && dT > 0)) return false
+  if (!isFallingBehindSample(prev, tempScale)) return false
+  if (!isFallingBehindSample(next, tempScale)) return false
+  if (!isFullPowerSample(next, assumeFullPowerIfUnknown)) return false
+  return true
+}
+
 function median(values: number[]): number | null {
   if (!values.length) return null
   const sorted = [...values].sort((a, b) => a - b)
@@ -127,152 +154,137 @@ function median(values: number[]): number | null {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
-function solve3x3(a: number[][], b: number[]): number[] | null {
-  const m = a.map((row, i) => [...row, b[i]])
-
-  for (let col = 0; col < 3; col += 1) {
-    let pivot = col
-    for (let row = col + 1; row < 3; row += 1) {
-      if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row
-    }
-    if (Math.abs(m[pivot][col]) < 1e-12) return null
-    if (pivot !== col) {
-      const tmp = m[col]
-      m[col] = m[pivot]
-      m[pivot] = tmp
-    }
-
-    const div = m[col][col]
-    for (let k = col; k < 4; k += 1) m[col][k] /= div
-
-    for (let row = 0; row < 3; row += 1) {
-      if (row === col) continue
-      const factor = m[row][col]
-      for (let k = col; k < 4; k += 1) m[row][k] -= factor * m[col][k]
-    }
-  }
-
-  return [m[0][3], m[1][3], m[2][3]]
+function ks818MaxTempForScale(tempScale: TempScale): number {
+  if (tempScale === 'c') return (KS818_MAX_TEMP_F - 32) * (5 / 9)
+  return KS818_MAX_TEMP_F
 }
 
-function fitQuadratic(points: Array<{ x: number; y: number }>): { a: number; b: number; c: number } | null {
-  if (points.length < 3) return null
+function fitKFixedAsymptote(points: Array<{ temp: number; rate: number }>, tInf: number): number | null {
+  if (points.length < 2) return null
 
-  let n = 0
-  let sumX = 0
+  let usable = 0
   let sumX2 = 0
-  let sumX3 = 0
-  let sumX4 = 0
-  let sumY = 0
   let sumXY = 0
-  let sumX2Y = 0
 
   for (const p of points) {
-    const x = p.x
-    const y = p.y
-    const x2 = x * x
-    n += 1
-    sumX += x
-    sumX2 += x2
-    sumX3 += x2 * x
-    sumX4 += x2 * x2
-    sumY += y
-    sumXY += x * y
-    sumX2Y += x2 * y
+    if (!Number.isFinite(p.temp) || !Number.isFinite(p.rate)) continue
+    if (!(p.rate > 0)) continue
+    const x = tInf - p.temp
+    if (!(x > 0)) continue
+    usable += 1
+    sumX2 += x * x
+    sumXY += x * p.rate
   }
 
-  const coeffs = solve3x3(
-    [
-      [n, sumX, sumX2],
-      [sumX, sumX2, sumX3],
-      [sumX2, sumX3, sumX4],
-    ],
-    [sumY, sumXY, sumX2Y],
-  )
+  if (usable < 2) return null
+  if (!(sumX2 > 1e-12)) return null
+  const k = sumXY / sumX2
+  if (!Number.isFinite(k) || !(k > 0)) return null
+  return k
+}
 
-  if (!coeffs) return null
-  const [c, b, a] = coeffs
-  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return null
-  return { a, b, c }
+function buildFlatCurve(rateSamples: RateSample[], minRate: number, temps: number[]): Curve | null {
+  const rates = rateSamples.map((s) => s.rate).filter((r) => Number.isFinite(r) && r > 0)
+  const flat = median(rates)
+  if (flat === null) return null
+  const safeRate = Math.max(minRate, flat)
+  const rateAt = () => safeRate
+  const timeToHeat = (fromTemp: number, toTemp: number): number => {
+    if (!Number.isFinite(fromTemp) || !Number.isFinite(toTemp) || !(toTemp > fromTemp)) return 0
+    return Math.max(0, (toTemp - fromTemp) / safeRate)
+  }
+  return { temps, rates: temps.map(() => safeRate), minRate, k: null, tInf: null, rateAt, timeToHeat }
+}
+
+function buildDebugTemps(rateSamples: RateSample[]): number[] {
+  const sorted = rateSamples
+    .map((s) => s.temp)
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => a - b)
+  if (!sorted.length) return []
+
+  const maxPoints = 120
+  if (sorted.length <= maxPoints) return sorted
+
+  const stride = (sorted.length - 1) / (maxPoints - 1)
+  const out: number[] = []
+  for (let i = 0; i < maxPoints; i += 1) {
+    out.push(sorted[Math.round(i * stride)])
+  }
+  return out
+}
+
+function timeToHeatExponential(opts: {
+  fromTemp: number
+  toTemp: number
+  k: number
+  tInf: number
+  minRate: number
+  tempScale: TempScale
+}): number {
+  const { fromTemp, toTemp, k, tInf, minRate, tempScale } = opts
+  if (!Number.isFinite(fromTemp) || !Number.isFinite(toTemp) || !Number.isFinite(k) || !Number.isFinite(tInf)) return 0
+  if (!(k > 0) || !(toTemp > fromTemp)) return 0
+
+  // Inverse of y(t) = T_inf - (T_inf - y0) * e^(-k t), with a min-rate floor near asymptote.
+  const epsilon = tempScale === 'c' ? 0.25 : 0.5
+  const capTemp = tInf - epsilon
+  let from = fromTemp
+  let to = toTemp
+  let dt = 0
+
+  if (from < capTemp) {
+    const expTo = Math.min(to, capTemp)
+    if (expTo > from) {
+      const num = tInf - from
+      const den = tInf - expTo
+      if (num > 0 && den > 0) {
+        const part = Math.log(num / den) / k
+        if (!Number.isFinite(part) || part < 0) return 0
+        dt += part
+      } else {
+        return Math.max(0, (toTemp - fromTemp) / minRate)
+      }
+      from = expTo
+    }
+  }
+
+  if (to > from) {
+    dt += (to - from) / minRate
+  }
+
+  if (!Number.isFinite(dt) || dt < 0) return 0
+  return dt
 }
 
 function buildCurve(rateSamples: RateSample[], tempScale: TempScale): Curve | null {
   if (rateSamples.length < 3) return null
 
-  const binSize = tempScale === 'c' ? 10 : 25
   const minRate = tempScale === 'c' ? 0.005 : 0.01
+  const raw = rateSamples.filter((s) => Number.isFinite(s.temp) && Number.isFinite(s.rate) && s.rate > 0)
+  if (raw.length < 3) return null
 
-  const bins = new Map<number, number[]>()
-  for (const sample of rateSamples) {
-    if (!(sample.rate > 0)) continue
-    const bin = Math.floor(sample.temp / binSize) * binSize + binSize / 2
-    const arr = bins.get(bin)
-    if (arr) arr.push(sample.rate)
-    else bins.set(bin, [sample.rate])
+  const temps = buildDebugTemps(raw)
+  if (!temps.length) {
+    return buildFlatCurve(raw, minRate, [raw[0].temp, raw[raw.length - 1].temp].sort((a, b) => a - b))
   }
 
-  const points: Array<{ temp: number; rate: number }> = []
-  for (const [temp, rates] of [...bins.entries()].sort((a, b) => a[0] - b[0])) {
-    const med = median(rates)
-    if (med !== null && med > 0) points.push({ temp, rate: med })
-  }
-
-  if (points.length < 3) {
-    const rates = rateSamples.map((s) => s.rate).filter((r) => Number.isFinite(r) && r > 0)
-    const flat = median(rates)
-    if (flat === null) return null
-    const minRate = tempScale === 'c' ? 0.005 : 0.01
-    const safeRate = Math.max(minRate, flat)
-    const temps = points.length
-      ? points.map((p) => p.temp)
-      : [rateSamples[0].temp, rateSamples[rateSamples.length - 1].temp].sort((a, b) => a - b)
-    const rateAt = () => safeRate
-    return { temps, rates: temps.map(() => safeRate), minRate, rateAt }
-  }
-
-  const fit = fitQuadratic(points.map((p) => ({ x: p.temp, y: p.rate })))
-
-  const temps = points.map((p) => p.temp)
-  const rawRates = points.map((p) => {
-    if (fit) {
-      const r = fit.a * p.temp * p.temp + fit.b * p.temp + fit.c
-      if (Number.isFinite(r) && r > 0) return r
-    }
-    return p.rate
-  })
-
-  const rates: number[] = []
-  for (let i = 0; i < rawRates.length; i += 1) {
-    const prev = i > 0 ? rates[i - 1] : rawRates[i]
-    const clamped = Math.min(rawRates[i], prev)
-    rates.push(Math.max(minRate, clamped))
-  }
+  const tInf = ks818MaxTempForScale(tempScale)
+  const k = fitKFixedAsymptote(raw, tInf)
+  if (!(k && k > 1e-6)) return buildFlatCurve(raw, minRate, temps)
 
   const rateAt = (temp: number): number => {
     if (!Number.isFinite(temp)) return minRate
-    if (temp <= temps[0]) return rates[0]
-    const lastIdx = temps.length - 1
-    if (temp >= temps[lastIdx]) {
-      if (fit) {
-        const r = fit.a * temp * temp + fit.b * temp + fit.c
-        if (Number.isFinite(r)) return Math.max(minRate, Math.min(r, rates[lastIdx]))
-      }
-      return rates[lastIdx]
-    }
-
-    let hi = temps.findIndex((t) => t >= temp)
-    if (hi <= 0) return rates[0]
-    const lo = hi - 1
-    const t0 = temps[lo]
-    const t1 = temps[hi]
-    const r0 = rates[lo]
-    const r1 = rates[hi]
-    const pct = (temp - t0) / (t1 - t0)
-    const interp = r0 + (r1 - r0) * pct
-    return Math.max(minRate, interp)
+    const modeled = k * (tInf - temp)
+    if (!Number.isFinite(modeled)) return minRate
+    return Math.max(minRate, modeled)
+  }
+  const rates = temps.map((temp) => rateAt(temp))
+  const timeToHeat = (fromTemp: number, toTemp: number): number => {
+    return timeToHeatExponential({ fromTemp, toTemp, k, tInf, minRate, tempScale })
   }
 
-  return { temps, rates, minRate, rateAt }
+  return { temps, rates, minRate, k, tInf, rateAt, timeToHeat }
 }
 
 function interpolateTarget(profile: Array<[number, number]>, timeS: number): number | null {
@@ -301,7 +313,7 @@ function computeCatchUpDelay(opts: {
   curve: Curve
   tempScale: TempScale
 }): number {
-  const { profile, runtimeS, currentTemp, curve, tempScale } = opts
+  const { profile, runtimeS, currentTemp, curve } = opts
   if (profile.length < 2) return 0
 
   const ordered = [...profile].sort((a, b) => a[0] - b[0])
@@ -312,7 +324,8 @@ function computeCatchUpDelay(opts: {
   const targetAtRuntime = interpolateTarget(ordered, clampedRuntime)
   if (targetAtRuntime === null) return 0
 
-  const step = tempScale === 'c' ? 0.5 : 1
+  const maxSegmentDelayS = 12 * 3600
+  const maxTotalDelayS = 48 * 3600
   let delay = 0
 
   let segStartTime = clampedRuntime
@@ -333,15 +346,10 @@ function computeCatchUpDelay(opts: {
       let temp = segStartTemp
       if (temp > segEndTarget) temp = segEndTarget
 
-      let achievable = 0
-      for (let t = temp; t < segEndTarget; t += step) {
-        const nextT = Math.min(segEndTarget, t + step)
-        const mid = (t + nextT) / 2
-        const rate = curve.rateAt(mid)
-        achievable += (nextT - t) / rate
+      const achievable = curve.timeToHeat(temp, segEndTarget)
+      if (achievable > scheduledTime) {
+        delay += Math.min(maxSegmentDelayS, achievable - scheduledTime)
       }
-
-      if (achievable > scheduledTime) delay += achievable - scheduledTime
     }
 
     segStartTime = segEndTime
@@ -349,7 +357,7 @@ function computeCatchUpDelay(opts: {
     segStartTemp = segEndTarget
   }
 
-  return Math.max(0, delay)
+  return Math.max(0, Math.min(delay, maxTotalDelayS))
 }
 
 function isCatchingUp(oven: OvenState | null, tempScale: TempScale): boolean {
@@ -408,13 +416,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     const dt = sample.elapsedS - prev.elapsedS
     const dT = sample.temp - prev.temp
     const assumeFullPowerIfUnknown = opts?.assumeFullPowerIfUnknown ?? false
-    if (
-      dt >= 0.5 &&
-      dt <= 5 &&
-      dT > 0 &&
-      isFullPowerSample(sample, assumeFullPowerIfUnknown) &&
-      isTrailingSample(sample, tempScale)
-    ) {
+    if (shouldUseRatePair({ prev, next: sample, tempScale, assumeFullPowerIfUnknown })) {
       const rate = dT / dt
       if (Number.isFinite(rate) && rate > 0) {
         rateSamplesRef.current.push({ temp: (sample.temp + prev.temp) / 2, rate })
@@ -467,13 +469,7 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         if (prevDb) {
           const dt = s.t - prevDb.t
           const dT = sample.temp - prevDb.sample.temp
-          if (
-            dt >= 0.5 &&
-            dt <= 5 &&
-            dT > 0 &&
-            isTrailingSample(sample, tempScale) &&
-            isFullPowerSample(sample, true)
-          ) {
+          if (shouldUseRatePair({ prev: prevDb.sample, next: sample, tempScale, assumeFullPowerIfUnknown: true })) {
             const rate = dT / dt
             if (Number.isFinite(rate) && rate > 0) {
               rateSamplesRef.current.push({ temp: (sample.temp + prevDb.sample.temp) / 2, rate })
@@ -596,6 +592,9 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         delayS: delayRef.current,
         lastFitAtMs: lastFitAtRef.current,
         profilePoints: scheduleRef.current?.length ?? backlog?.profile?.data?.length ?? 0,
+        fitK: curveRef.current?.k ?? null,
+        fitAsymptote: curveRef.current?.tInf ?? null,
+        fitMode: curveRef.current ? (curveRef.current.k !== null && curveRef.current.tInf !== null ? 'exp' : 'flat') : 'none',
       })
       return
     }
@@ -655,6 +654,9 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       delayS: delayRef.current,
       lastFitAtMs: lastFitAtRef.current,
       profilePoints: scheduleRef.current?.length ?? backlog?.profile?.data?.length ?? 0,
+      fitK: curveRef.current?.k ?? null,
+      fitAsymptote: curveRef.current?.tInf ?? null,
+      fitMode: curveRef.current ? (curveRef.current.k !== null && curveRef.current.tInf !== null ? 'exp' : 'flat') : 'none',
     })
   }, [oven, backlog, runtimeS, elapsedS, remainingS, tempScale])
 
