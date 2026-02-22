@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { EChartsType } from 'echarts/core'
 import type { OvenState, StatusBacklogEnvelope } from '../contract/status'
 import { apiListSessions, apiGetSession } from '../api/sessions'
-import { extractTemp, extractTarget } from '../util/sampleExtract'
-import { fetchAllSessionSamples } from '../util/fetchSessionSamples'
+import { extractPowerPercent } from '../util/sampleExtract'
+import { fetchSamplesWindow } from '../util/fetchSessionSamples'
 import type { Point } from '../util/chartFormatting'
 import { schemeForTheme } from '../util/chartTheme'
 import { readZoomWindowValues } from '../util/chartZoom'
@@ -54,12 +54,14 @@ export function LiveTempChart(props: LiveTempChartProps) {
   const targetRef = useRef<Point[]>([])
   const scheduleRef = useRef<Point[]>([])
   const cooldownRef = useRef<Point[]>([])
+  const powerRef = useRef<Point[]>([])
   const profileEndMsRef = useRef<number | null>(null)
   const prevOvenStateRef = useRef<string | null>(null)
 
   const maxPoints = 24 * 60 * 60 // 24 hours at 1 Hz
   const LIVE_WINDOW_MS = 30 * 60 * 1000
   const MIN_ZOOM_MS = 10 * 1000
+  const LIVE_SEED_WINDOW_SEC = 60 * 60
 
   // Extent of actual + cooldown data — used for live zoom logic.
   const timeExtent = () => {
@@ -93,6 +95,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
     update(cooldownRef.current)
     update(targetRef.current)
     update(scheduleRef.current)
+    update(powerRef.current)
     if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null
     return { min, max }
   }
@@ -215,6 +218,7 @@ export function LiveTempChart(props: LiveTempChartProps) {
           },
           { data: targetRef.current },
           { data: scheduleRef.current },
+          { data: powerRef.current },
         ],
       },
       { notMerge: false, lazyUpdate: true },
@@ -240,6 +244,8 @@ export function LiveTempChart(props: LiveTempChartProps) {
     const run = async () => {
       let sessionId: string
       let startedAt: number
+      const nowSec = Math.floor(Date.now() / 1000)
+      const maxPointsSeed = 2000
 
       if (isCooldown && lastLog.cooldown_session_id) {
         // Cooldown: fetch the session that just completed.
@@ -266,19 +272,27 @@ export function LiveTempChart(props: LiveTempChartProps) {
         }
 
         // Fetch all samples and split at ended_at.
-        const samples = await fetchAllSessionSamples({ sessionId, from: startedAt, signal: ac.signal })
+        const samples = await fetchSamplesWindow({
+          from: startedAt,
+          to: nowSec,
+          maxPoints: maxPointsSeed,
+          signal: ac.signal,
+        })
 
         const actual: Point[] = []
         const target: Point[] = []
         const cooldown: Point[] = []
+        const power: Point[] = []
 
         for (const s of samples) {
           const tMs = s.t * 1000
           if (typeof endedAt === 'number' && s.t > endedAt) {
-            cooldown.push([tMs, extractTemp(s.state)])
+            cooldown.push([tMs, s.temp ?? null])
+            power.push([tMs, s.power_percent ?? null])
           } else {
-            actual.push([tMs, extractTemp(s.state)])
-            target.push([tMs, extractTarget(s.state)])
+            actual.push([tMs, s.temp ?? null])
+            target.push([tMs, s.target ?? null])
+            power.push([tMs, s.power_percent ?? null])
           }
         }
 
@@ -290,12 +304,14 @@ export function LiveTempChart(props: LiveTempChartProps) {
             const endMs = profileEndMsRef.current ?? runStartMs
             const tMs = endMs + entry.cooldown_elapsed * 1000
             cooldown.push([tMs, Number.isFinite(entry.temperature) ? entry.temperature : null])
+            power.push([tMs, extractPowerPercent(entry)])
           }
         }
 
         actualRef.current = actual
         targetRef.current = target
         cooldownRef.current = cooldown
+        powerRef.current = power
 
       } else if (isRunning) {
         // Running: standard DB seed.
@@ -313,14 +329,22 @@ export function LiveTempChart(props: LiveTempChartProps) {
         const runStartMs = startedAt * 1000
         runStartMsRef.current = runStartMs
 
-        const samples = await fetchAllSessionSamples({ sessionId, from: startedAt, signal: ac.signal })
+        const fromWindow = Math.max(startedAt, nowSec - LIVE_SEED_WINDOW_SEC)
+        const samples = await fetchSamplesWindow({
+          from: fromWindow,
+          to: nowSec,
+          maxPoints: maxPointsSeed,
+          signal: ac.signal,
+        })
 
         const actual: Point[] = []
         const target: Point[] = []
+        const power: Point[] = []
         for (const s of samples) {
           const tMs = s.t * 1000
-          actual.push([tMs, extractTemp(s.state)])
-          target.push([tMs, extractTarget(s.state)])
+          actual.push([tMs, s.temp ?? null])
+          target.push([tMs, s.target ?? null])
+          power.push([tMs, s.power_percent ?? null])
         }
 
         let schedule: Point[] = []
@@ -339,11 +363,13 @@ export function LiveTempChart(props: LiveTempChartProps) {
           if (entryT <= lastDbMs) continue
           actual.push([entryT, Number.isFinite(entry.temperature) ? entry.temperature : null])
           target.push([entryT, isTargetAvailable(entry) ? entry.target : null])
+          power.push([entryT, extractPowerPercent(entry)])
         }
 
         actualRef.current = actual
         targetRef.current = target
         scheduleRef.current = schedule
+        powerRef.current = power
 
       } else {
         // Idle without cooldown: load the most recent completed session.
@@ -373,24 +399,34 @@ export function LiveTempChart(props: LiveTempChartProps) {
           profileEndMsRef.current = endedAt * 1000
         }
 
-        const samples = await fetchAllSessionSamples({ sessionId, from: startedAt, signal: ac.signal })
+        const endSec = typeof endedAt === 'number' ? endedAt : nowSec
+        const samples = await fetchSamplesWindow({
+          from: startedAt,
+          to: endSec,
+          maxPoints: maxPointsSeed,
+          signal: ac.signal,
+        })
         const actual: Point[] = []
         const target: Point[] = []
         const cooldown: Point[] = []
+        const power: Point[] = []
 
         for (const s of samples) {
           const tMs = s.t * 1000
           if (typeof endedAt === 'number' && s.t > endedAt) {
-            cooldown.push([tMs, extractTemp(s.state)])
+            cooldown.push([tMs, s.temp ?? null])
+            power.push([tMs, s.power_percent ?? null])
           } else {
-            actual.push([tMs, extractTemp(s.state)])
-            target.push([tMs, extractTarget(s.state)])
+            actual.push([tMs, s.temp ?? null])
+            target.push([tMs, s.target ?? null])
+            power.push([tMs, s.power_percent ?? null])
           }
         }
 
         actualRef.current = actual
         targetRef.current = target
         cooldownRef.current = cooldown
+        powerRef.current = power
         wsPendingBufferRef.current = []
       }
 
@@ -440,18 +476,22 @@ export function LiveTempChart(props: LiveTempChartProps) {
 
     const actual: Point[] = []
     const target: Point[] = []
+    const power: Point[] = []
 
     for (let i = 0; i < log.length; i++) {
       const oven = log[i]
       const t = runStartMs + (typeof oven.elapsed === 'number' ? oven.elapsed : oven.runtime) * 1000
       actual.push([t, Number.isFinite(oven.temperature) ? oven.temperature : null])
       target.push([t, isTargetAvailable(oven) ? oven.target : null])
+      power.push([t, extractPowerPercent(oven)])
     }
 
     actualRef.current = actual
     targetRef.current = target
+    powerRef.current = power
     clampHistory(actualRef.current, maxPoints)
     clampHistory(targetRef.current, maxPoints)
+    clampHistory(powerRef.current, maxPoints)
 
     if (backlog.profile?.data) {
       scheduleRef.current = backlog.profile.data.map(
@@ -509,13 +549,16 @@ export function LiveTempChart(props: LiveTempChartProps) {
       const t = runStartMsRef.current + (typeof oven.elapsed === 'number' ? oven.elapsed : oven.runtime) * 1000
       actualRef.current.push([t, Number.isFinite(oven.temperature) ? oven.temperature : null])
       targetRef.current.push([t, isTargetAvailable(oven) ? oven.target : null])
+      powerRef.current.push([t, extractPowerPercent(oven)])
       clampHistory(actualRef.current, maxPoints)
       clampHistory(targetRef.current, maxPoints)
+      clampHistory(powerRef.current, maxPoints)
     } else if (oven.state === 'IDLE' && oven.cooldown_active && typeof oven.cooldown_elapsed === 'number') {
       // Cooldown tick.
       const endMs = profileEndMsRef.current ?? runStartMsRef.current
       const t = endMs + oven.cooldown_elapsed * 1000
       cooldownRef.current.push([t, Number.isFinite(oven.temperature) ? oven.temperature : null])
+      powerRef.current.push([t, extractPowerPercent(oven)])
     }
 
     // Skip chart updates while user is dragging.

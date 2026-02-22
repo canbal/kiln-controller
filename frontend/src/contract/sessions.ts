@@ -32,9 +32,13 @@ export const listSessionsResponseSchema = z
 export const sessionSampleSchema = z
   .object({
     t: z.number(),
-    // Server stores a full `Oven.get_state()` payload per sample.
-    // Keep as unknown-ish and validate only what we need in the chart.
-    state: z.unknown().nullable(),
+    // New TSDB samples include explicit fields.
+    temp: z.number().nullable().optional(),
+    target: z.number().nullable().optional(),
+    power_percent: z.number().nullable().optional(),
+    // Legacy SQLite samples stored a full `Oven.get_state()` payload per sample.
+    // Keep as unknown-ish for compatibility.
+    state: z.unknown().nullable().optional(),
   })
   .passthrough()
 

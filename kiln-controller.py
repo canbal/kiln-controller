@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 import json
+import time
 
 import bottle
 import gevent
@@ -253,32 +254,79 @@ def v1_list_session_samples(session_id):
     try:
         from_t = _q_int("from", default=None, min_value=0, max_value=2**31 - 1)
         to_t = _q_int("to", default=None, min_value=0, max_value=2**31 - 1)
-        limit = _q_int("limit", default=500, min_value=1, max_value=5000)
+        max_points = _q_int(
+            "max_points",
+            default=getattr(config, "tsdb_max_points_default", 2000),
+            min_value=200,
+            max_value=5000,
+        )
     except ValueError:
         return _json_response({"success": False, "error": "bad_request"}, status=400)
 
     try:
-        from kiln_db import get_session, list_session_samples
+        from kiln_db import get_session
+        from tsdb_vm import query_range
 
         db_path = _configured_sqlite_db_path()
         sess = get_session(db_path, session_id=session_id)
         if not sess:
             return _json_response({"success": False, "error": "not_found"}, status=404)
 
-        samples = list_session_samples(db_path, session_id=session_id, from_t=from_t, to_t=to_t, limit=limit)
+        start = from_t if from_t is not None else sess.get("started_at") or sess.get("created_at") or int(time.time())
+        end = to_t if to_t is not None else (sess.get("ended_at") or int(time.time()))
+
+        samples = query_range(start=int(start), end=int(end), max_points=max_points)
         return _json_response(
             {
                 "success": True,
                 "session": sess,
                 "session_id": session_id,
-                "from": from_t,
-                "to": to_t,
+                "from": start,
+                "to": end,
                 "samples": samples,
                 "count": len(samples),
             }
         )
     except Exception:
         log.exception("/v1/sessions/%s/samples failed" % session_id)
+        return _json_response({"success": False, "error": "db_unavailable"}, status=503)
+
+
+@app.get('/v1/samples')
+def v1_list_samples():
+    """Fetch a time-bounded sample window from the TSDB."""
+
+    try:
+        from_t = _q_int("from", default=None, min_value=0, max_value=2**31 - 1)
+        to_t = _q_int("to", default=None, min_value=0, max_value=2**31 - 1)
+        max_points = _q_int(
+            "max_points",
+            default=getattr(config, "tsdb_max_points_default", 2000),
+            min_value=200,
+            max_value=5000,
+        )
+    except ValueError:
+        return _json_response({"success": False, "error": "bad_request"}, status=400)
+
+    try:
+        from tsdb_vm import query_range
+
+        end = int(to_t if to_t is not None else time.time())
+        start_default = max(0, end - 3600)
+        start = int(from_t if from_t is not None else start_default)
+
+        samples = query_range(start=start, end=end, max_points=max_points)
+        return _json_response(
+            {
+                "success": True,
+                "from": start,
+                "to": end,
+                "samples": samples,
+                "count": len(samples),
+            }
+        )
+    except Exception:
+        log.exception("/v1/samples failed")
         return _json_response({"success": False, "error": "db_unavailable"}, status=503)
 
 
