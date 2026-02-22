@@ -6,6 +6,7 @@ import { z } from 'zod'
 export const configEnvelopeSchema = z
   .object({
     temp_scale: z.string(),
+    eta_max_temp_f: z.number().optional(),
   })
   .passthrough()
 

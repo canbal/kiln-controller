@@ -19,12 +19,8 @@ type RateSample = {
 }
 
 type Curve = {
-  temps: number[]
-  rates: number[]
-  minRate: number
   k: number | null
   tInf: number | null
-  rateAt: (temp: number) => number
   timeToHeat: (fromTemp: number, toTemp: number) => number
 }
 
@@ -35,32 +31,12 @@ type UseEtaEstimateOpts = {
   elapsedS: number | null
   totalS: number | null
   tempScale: TempScale
+  etaMaxTempF: number | null
 }
 
 const MAX_SAMPLES = 30_000
 const MAX_RATE_SAMPLES = 20_000
 const FULL_POWER_SAMPLE_WINDOW = 10
-const KS818_MAX_TEMP_F = 2350
-
-export type EtaDebugInfo = {
-  catchingUp: boolean
-  fullPower: boolean
-  pidOut: number | null
-  targetDelta: number | null
-  samples: number
-  dbSeeded: boolean
-  dbSamples: number
-  rateSamples: number
-  fullPowerSinceFit: number
-  curveBins: number
-  calculating: boolean
-  delayS: number
-  lastFitAtMs: number | null
-  profilePoints: number
-  fitK: number | null
-  fitAsymptote: number | null
-  fitMode: 'exp' | 'flat' | 'none'
-}
 
 function finiteOrNull(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -154,9 +130,10 @@ function median(values: number[]): number | null {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
-function ks818MaxTempForScale(tempScale: TempScale): number {
-  if (tempScale === 'c') return (KS818_MAX_TEMP_F - 32) * (5 / 9)
-  return KS818_MAX_TEMP_F
+function etaMaxTempForScale(tempScale: TempScale, etaMaxTempF: number | null): number | null {
+  if (etaMaxTempF === null || !Number.isFinite(etaMaxTempF) || !(etaMaxTempF > 0)) return null
+  if (tempScale === 'c') return (etaMaxTempF - 32) * (5 / 9)
+  return etaMaxTempF
 }
 
 function fitKFixedAsymptote(points: Array<{ temp: number; rate: number }>, tInf: number): number | null {
@@ -183,35 +160,16 @@ function fitKFixedAsymptote(points: Array<{ temp: number; rate: number }>, tInf:
   return k
 }
 
-function buildFlatCurve(rateSamples: RateSample[], minRate: number, temps: number[]): Curve | null {
+function buildFlatCurve(rateSamples: RateSample[], minRate: number): Curve | null {
   const rates = rateSamples.map((s) => s.rate).filter((r) => Number.isFinite(r) && r > 0)
   const flat = median(rates)
   if (flat === null) return null
   const safeRate = Math.max(minRate, flat)
-  const rateAt = () => safeRate
   const timeToHeat = (fromTemp: number, toTemp: number): number => {
     if (!Number.isFinite(fromTemp) || !Number.isFinite(toTemp) || !(toTemp > fromTemp)) return 0
     return Math.max(0, (toTemp - fromTemp) / safeRate)
   }
-  return { temps, rates: temps.map(() => safeRate), minRate, k: null, tInf: null, rateAt, timeToHeat }
-}
-
-function buildDebugTemps(rateSamples: RateSample[]): number[] {
-  const sorted = rateSamples
-    .map((s) => s.temp)
-    .filter((t) => Number.isFinite(t))
-    .sort((a, b) => a - b)
-  if (!sorted.length) return []
-
-  const maxPoints = 120
-  if (sorted.length <= maxPoints) return sorted
-
-  const stride = (sorted.length - 1) / (maxPoints - 1)
-  const out: number[] = []
-  for (let i = 0; i < maxPoints; i += 1) {
-    out.push(sorted[Math.round(i * stride)])
-  }
-  return out
+  return { k: null, tInf: null, timeToHeat }
 }
 
 function timeToHeatExponential(opts: {
@@ -257,34 +215,23 @@ function timeToHeatExponential(opts: {
   return dt
 }
 
-function buildCurve(rateSamples: RateSample[], tempScale: TempScale): Curve | null {
+function buildCurve(rateSamples: RateSample[], tempScale: TempScale, etaMaxTempF: number | null): Curve | null {
   if (rateSamples.length < 3) return null
 
   const minRate = tempScale === 'c' ? 0.005 : 0.01
   const raw = rateSamples.filter((s) => Number.isFinite(s.temp) && Number.isFinite(s.rate) && s.rate > 0)
   if (raw.length < 3) return null
 
-  const temps = buildDebugTemps(raw)
-  if (!temps.length) {
-    return buildFlatCurve(raw, minRate, [raw[0].temp, raw[raw.length - 1].temp].sort((a, b) => a - b))
-  }
-
-  const tInf = ks818MaxTempForScale(tempScale)
+  const tInf = etaMaxTempForScale(tempScale, etaMaxTempF)
+  if (tInf === null) return null
   const k = fitKFixedAsymptote(raw, tInf)
-  if (!(k && k > 1e-6)) return buildFlatCurve(raw, minRate, temps)
+  if (!(k && k > 1e-6)) return buildFlatCurve(raw, minRate)
 
-  const rateAt = (temp: number): number => {
-    if (!Number.isFinite(temp)) return minRate
-    const modeled = k * (tInf - temp)
-    if (!Number.isFinite(modeled)) return minRate
-    return Math.max(minRate, modeled)
-  }
-  const rates = temps.map((temp) => rateAt(temp))
   const timeToHeat = (fromTemp: number, toTemp: number): number => {
     return timeToHeatExponential({ fromTemp, toTemp, k, tInf, minRate, tempScale })
   }
 
-  return { temps, rates, minRate, k, tInf, rateAt, timeToHeat }
+  return { k, tInf, timeToHeat }
 }
 
 function interpolateTarget(profile: Array<[number, number]>, timeS: number): number | null {
@@ -311,7 +258,6 @@ function computeCatchUpDelay(opts: {
   runtimeS: number
   currentTemp: number
   curve: Curve
-  tempScale: TempScale
 }): number {
   const { profile, runtimeS, currentTemp, curve } = opts
   if (profile.length < 2) return 0
@@ -372,17 +318,15 @@ function isCatchingUp(oven: OvenState | null, tempScale: TempScale): boolean {
   return delta > (tempScale === 'c' ? 3 : 5)
 }
 
-export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; debug: EtaDebugInfo | null } {
-  const { oven, backlog, runtimeS, elapsedS, totalS, tempScale } = opts
+export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null } {
+  const { oven, backlog, runtimeS, elapsedS, totalS, tempScale, etaMaxTempF } = opts
   const [eta, setEta] = useState<number | null>(null)
-  const [debug, setDebug] = useState<EtaDebugInfo | null>(null)
 
   const samplesRef = useRef<Sample[]>([])
   const rateSamplesRef = useRef<RateSample[]>([])
   const fullPowerSinceFitRef = useRef(0)
   const curveRef = useRef<Curve | null>(null)
   const delayRef = useRef(0)
-  const lastFitAtRef = useRef<number | null>(null)
   const lastCatchUpAtRef = useRef<number | null>(null)
   const lastProfileRef = useRef<string | null>(null)
   const lastRuntimeRef = useRef<number | null>(null)
@@ -390,7 +334,6 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
   const dbSeededRef = useRef(false)
   const dbFetchPendingRef = useRef(false)
   const dbFetchDoneRef = useRef(false)
-  const dbSamplesRef = useRef(0)
   const scheduleRef = useRef<Array<[number, number]> | null>(null)
 
   const remainingS = useMemo(() => {
@@ -456,7 +399,6 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       samplesRef.current = []
       rateSamplesRef.current = []
       fullPowerSinceFitRef.current = 0
-      let added = 0
       const schedule = scheduleRef.current
       let prevDb: { t: number; sample: Sample } | null = null
       for (const s of samples) {
@@ -464,7 +406,6 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         const sample = sampleFromState(s.state, elapsedS, schedule)
         if (!sample) continue
         appendSample(sample, { assumeFullPowerIfUnknown: true, skipRateSample: true })
-        added += 1
 
         if (prevDb) {
           const dt = s.t - prevDb.t
@@ -481,7 +422,6 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         }
         prevDb = { t: s.t, sample }
       }
-      dbSamplesRef.current = added
       dbSeededRef.current = true
     }
 
@@ -504,7 +444,6 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       fullPowerSinceFitRef.current = 0
       curveRef.current = null
       delayRef.current = 0
-      lastFitAtRef.current = null
       lastCatchUpAtRef.current = null
       lastProfileRef.current = null
       lastRuntimeRef.current = null
@@ -512,10 +451,8 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       dbSeededRef.current = false
       dbFetchPendingRef.current = false
       dbFetchDoneRef.current = false
-      dbSamplesRef.current = 0
       scheduleRef.current = null
       setEta(null)
-      setDebug(null)
       return
     }
 
@@ -534,13 +471,11 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
       fullPowerSinceFitRef.current = 0
       curveRef.current = null
       delayRef.current = 0
-      lastFitAtRef.current = null
       lastCatchUpAtRef.current = null
       seededRef.current = false
       dbSeededRef.current = false
       dbFetchPendingRef.current = false
       dbFetchDoneRef.current = false
-      dbSamplesRef.current = 0
       scheduleRef.current = null
     }
     lastProfileRef.current = profileName
@@ -571,31 +506,10 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
     appendSample(sample)
 
     const catchingUp = isCatchingUp(oven, tempScale)
-    const fullPower = isFullPower(oven)
-    const targetDelta = Number.isFinite(target) && Number.isFinite(temp) ? target - temp : null
 
     const dbReady = dbFetchDoneRef.current
     if (!dbReady) {
       setEta(null)
-      setDebug({
-        catchingUp,
-        fullPower,
-        pidOut: pidOutFromOven(oven),
-        targetDelta,
-        samples: samplesRef.current.length,
-        dbSeeded: dbSeededRef.current,
-        dbSamples: dbSamplesRef.current,
-        rateSamples: rateSamplesRef.current.length,
-        fullPowerSinceFit: fullPowerSinceFitRef.current,
-        curveBins: curveRef.current?.temps.length ?? 0,
-        calculating: true,
-        delayS: delayRef.current,
-        lastFitAtMs: lastFitAtRef.current,
-        profilePoints: scheduleRef.current?.length ?? backlog?.profile?.data?.length ?? 0,
-        fitK: curveRef.current?.k ?? null,
-        fitAsymptote: curveRef.current?.tInf ?? null,
-        fitMode: curveRef.current ? (curveRef.current.k !== null && curveRef.current.tInf !== null ? 'exp' : 'flat') : 'none',
-      })
       return
     }
 
@@ -609,14 +523,16 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
         delayRef.current = 0
       }
       setEta(remainingS)
-    } else if (
+      return
+    }
+
+    if (
       fullPowerSinceFitRef.current >= FULL_POWER_SAMPLE_WINDOW ||
       (curveRef.current === null && rateSamplesRef.current.length >= FULL_POWER_SAMPLE_WINDOW)
     ) {
       lastCatchUpAtRef.current = Date.now()
-      curveRef.current = buildCurve(rateSamplesRef.current, tempScale)
+      curveRef.current = buildCurve(rateSamplesRef.current, tempScale, etaMaxTempF)
       fullPowerSinceFitRef.current = 0
-      lastFitAtRef.current = Date.now()
       const schedule = scheduleRef.current ?? backlog?.profile?.data ?? null
       if (curveRef.current && schedule && runtimeS !== null && Number.isFinite(runtimeS)) {
         delayRef.current = computeCatchUpDelay({
@@ -624,41 +540,19 @@ export function useEtaEstimate(opts: UseEtaEstimateOpts): { eta: number | null; 
           runtimeS,
           currentTemp: temp,
           curve: curveRef.current,
-          tempScale,
         })
       }
     }
 
-    if (remainingS !== null) {
-      setEta(remainingS + delayRef.current)
-    } else {
+    const calculating =
+      curveRef.current === null || (delayRef.current === 0 && rateSamplesRef.current.length < FULL_POWER_SAMPLE_WINDOW)
+    if (calculating || remainingS === null) {
       setEta(null)
+      return
     }
 
-    const calculating =
-      catchingUp &&
-      (curveRef.current === null || (delayRef.current === 0 && rateSamplesRef.current.length < FULL_POWER_SAMPLE_WINDOW))
+    setEta(remainingS + delayRef.current)
+  }, [oven, backlog, runtimeS, elapsedS, remainingS, tempScale, etaMaxTempF])
 
-    setDebug({
-      catchingUp,
-      fullPower,
-      pidOut: pidOutFromOven(oven),
-      targetDelta,
-      samples: samplesRef.current.length,
-      dbSeeded: dbSeededRef.current,
-      dbSamples: dbSamplesRef.current,
-      rateSamples: rateSamplesRef.current.length,
-      fullPowerSinceFit: fullPowerSinceFitRef.current,
-      curveBins: curveRef.current?.temps.length ?? 0,
-      calculating,
-      delayS: delayRef.current,
-      lastFitAtMs: lastFitAtRef.current,
-      profilePoints: scheduleRef.current?.length ?? backlog?.profile?.data?.length ?? 0,
-      fitK: curveRef.current?.k ?? null,
-      fitAsymptote: curveRef.current?.tInf ?? null,
-      fitMode: curveRef.current ? (curveRef.current.k !== null && curveRef.current.tInf !== null ? 'exp' : 'flat') : 'none',
-    })
-  }, [oven, backlog, runtimeS, elapsedS, remainingS, tempScale])
-
-  return { eta, debug }
+  return { eta }
 }

@@ -62,40 +62,6 @@ function formatDurationSeconds(v: number | null | undefined): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function formatBool(v: boolean | null | undefined): string {
-  if (v === null || v === undefined) return '--'
-  return v ? 'Yes' : 'No'
-}
-
-function formatSinceMs(ms: number | null | undefined): string {
-  if (ms === null || ms === undefined) return '--'
-  const age = Date.now() - ms
-  if (!Number.isFinite(age) || age < 0) return '--'
-  if (age < 60_000) return `${Math.round(age / 1000)}s`
-  if (age < 3_600_000) return `${Math.round(age / 60_000)}m`
-  return `${Math.round(age / 3_600_000)}h`
-}
-
-function formatFitK(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '--'
-  if (!Number.isFinite(v) || v <= 0) return '--'
-  if (v >= 0.01) return `${v.toFixed(4)} /s`
-  return `${v.toExponential(2)} /s`
-}
-
-function formatFitAsymptote(v: number | null | undefined, unit: string): string {
-  if (v === null || v === undefined) return '--'
-  if (!Number.isFinite(v)) return '--'
-  return `${v.toFixed(1)}°${unit}`
-}
-
-function formatFitMode(v: 'exp' | 'flat' | 'none' | null | undefined): string {
-  if (v === null || v === undefined) return '--'
-  if (v === 'exp') return 'Exp'
-  if (v === 'flat') return 'Flat'
-  return 'None'
-}
-
 function computeProgressPct(runtimeS: number | null, totalS: number | null): number | null {
   if (runtimeS === null || totalS === null) return null
   if (!Number.isFinite(runtimeS) || !Number.isFinite(totalS)) return null
@@ -178,13 +144,14 @@ function App() {
   const totalS = oven && Number.isFinite(oven.totaltime) ? oven.totaltime : null
   const progressPct = running ? computeProgressPct(runtimeS, totalS) : null
   const remainingS = running && runtimeS !== null && totalS !== null ? Math.max(0, totalS - runtimeS) : null
-  const { eta: estRemainingS, debug: etaDebug } = useEtaEstimate({
+  const { eta: estRemainingS } = useEtaEstimate({
     oven,
     backlog: status.backlog,
     runtimeS,
     elapsedS: wallElapsedS,
     totalS,
     tempScale: cfg.tempScale ?? null,
+    etaMaxTempF: cfg.config?.eta_max_temp_f ?? null,
   })
 
   const cooldownActive = oven?.cooldown_active === true
@@ -320,9 +287,7 @@ function App() {
 
             <div className="tile">
               <div className="tileLabel">Est remaining</div>
-              <div className="tileValue tileValue--mono">
-                {etaDebug?.calculating ? '--' : formatDurationSeconds(estRemainingS)}
-              </div>
+              <div className="tileValue tileValue--mono">{formatDurationSeconds(estRemainingS)}</div>
             </div>
 
             <div className="tile">
@@ -355,88 +320,6 @@ function App() {
             </div>
           </div>
         </article>
-
-        {running ? (
-          <article className="card card--span2" aria-label="ETA Debug">
-            <h2>ETA Debug</h2>
-            <div className="metricsTiles" aria-label="ETA debug metrics">
-              <div className="tile">
-                <div className="tileLabel">Catching Up</div>
-                <div className="tileValue tileValue--text">{formatBool(etaDebug?.catchingUp)}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Full Power</div>
-                <div className="tileValue tileValue--text">{formatBool(etaDebug?.fullPower)}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">PID Out</div>
-                <div className="tileValue">
-                  {etaDebug?.pidOut === null || etaDebug?.pidOut === undefined
-                    ? '--'
-                    : `${Math.round(etaDebug.pidOut * 100)}%`}
-                </div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Target Delta</div>
-                <div className="tileValue">
-                  {etaDebug?.targetDelta === null || etaDebug?.targetDelta === undefined
-                    ? '--'
-                    : `${etaDebug.targetDelta.toFixed(1)}°${unit}`}
-                </div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Samples</div>
-                <div className="tileValue">{etaDebug ? etaDebug.samples : '--'}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">DB Seeded</div>
-                <div className="tileValue tileValue--text">{formatBool(etaDebug?.dbSeeded)}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">DB Samples</div>
-                <div className="tileValue">{etaDebug ? etaDebug.dbSamples : '--'}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Rate Samples</div>
-                <div className="tileValue">{etaDebug ? etaDebug.rateSamples : '--'}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Since Fit</div>
-                <div className="tileValue">{etaDebug ? etaDebug.fullPowerSinceFit : '--'}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Curve Bins</div>
-                <div className="tileValue">{etaDebug ? etaDebug.curveBins : '--'}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Fit k</div>
-                <div className="tileValue">{formatFitK(etaDebug?.fitK)}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Asymptote</div>
-                <div className="tileValue">{formatFitAsymptote(etaDebug?.fitAsymptote, unit)}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Fit Mode</div>
-                <div className="tileValue tileValue--text">{formatFitMode(etaDebug?.fitMode)}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Delay</div>
-                <div className="tileValue tileValue--mono">
-                  {formatDurationSeconds(etaDebug?.delayS ?? null)}
-                </div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Last Fit</div>
-                <div className="tileValue">{formatSinceMs(etaDebug?.lastFitAtMs)}</div>
-              </div>
-              <div className="tile">
-                <div className="tileLabel">Profile Pts</div>
-                <div className="tileValue">{etaDebug ? etaDebug.profilePoints : '--'}</div>
-              </div>
-            </div>
-          </article>
-        ) : null}
 
         <article className="card card--span2" aria-label="Chart">
           <h2>Live Temperature</h2>
