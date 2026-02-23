@@ -19,11 +19,14 @@ log = logging.getLogger(__name__)
 try:
     from kiln_db import create_session as _sqlite_create_session
     from kiln_db import stop_session as _sqlite_stop_session
-    from kiln_db import add_session_sample as _sqlite_add_session_sample
 except Exception:
     _sqlite_create_session = None
     _sqlite_stop_session = None
-    _sqlite_add_session_sample = None
+
+try:
+    from tsdb_vm import write_sample as _tsdb_write_sample
+except Exception:
+    _tsdb_write_sample = None
 
 class DupFilter(object):
     def __init__(self):
@@ -236,16 +239,19 @@ class Oven(threading.Thread):
             self.lcd.write([0,0,0,0])
             self.lcd2.write([0,0,0,0])
 
-        # SQLite session lifecycle + sampling.
+        # SQLite session lifecycle (metadata only).
         #
         # - `_active_session_id`: current RUNNING session (profile executing)
         # - `_cooldown_session_id`: session that has ended (COMPLETED) but we
-        #   continue sampling during natural cooling for a limited time.
+        #   keep metadata for natural cooldown tracking.
         self._active_session_id: Optional[str] = None
         self._cooldown_session_id: Optional[str] = None
         self._cooldown_until_ts: Optional[float] = None
         self._cooldown_started_ts: Optional[float] = None
         self._session_lock = threading.Lock()
+
+        # TSDB sample throttling.
+        self._tsdb_last_sample_ts: float = 0.0
 
         # Wall-clock timing for UI/analytics.
         # `runtime` is schedule time and can be paused/shifted by catch-up logic.
@@ -333,21 +339,54 @@ class Oven(threading.Thread):
             self._cooldown_started_ts = None
             return True
 
-    def _persist_sample_if_possible(self, *, session_id: Optional[str] = None, state: Optional[dict] = None) -> None:
-        sid = session_id or self._active_session_id
-        if not sid:
+    def _persist_sample_if_possible(self, *, state: Optional[dict] = None) -> None:
+        if not getattr(config, "tsdb_enabled", False):
             return
-        if _sqlite_add_session_sample is None:
-            return
-        db_path = self._sqlite_db_path()
-        if not db_path:
+        if _tsdb_write_sample is None:
             return
 
+        now_ts = time.time()
+        interval = float(getattr(config, "tsdb_sample_interval_sec", 1) or 1)
+        if self._tsdb_last_sample_ts and now_ts - self._tsdb_last_sample_ts < interval:
+            return
+
+        st = state if state is not None else self.get_state()
+        temp = st.get("temperature", None) if isinstance(st, dict) else None
+        if not isinstance(temp, (int, float)):
+            return
+
+        threshold = float(getattr(config, "tsdb_threshold_temp", 0) or 0)
+        if temp < threshold:
+            return
+
+        target = st.get("target") if isinstance(st, dict) else None
+        if not isinstance(target, (int, float)) or target <= 0 or st.get("state") != "RUNNING":
+            target = None
+
+        power_percent = None
+        if isinstance(st, dict):
+            pidstats = st.get("pidstats") if isinstance(st.get("pidstats"), dict) else None
+            if pidstats and "out" in pidstats:
+                try:
+                    power_percent = float(pidstats["out"]) * 100.0
+                    if power_percent < 0:
+                        power_percent = 0.0
+                    if power_percent > 100:
+                        power_percent = 100.0
+                except Exception:
+                    power_percent = None
+
         try:
-            _sqlite_add_session_sample(db_path, session_id=sid, state=state if state is not None else self.get_state())
+            _tsdb_write_sample(
+                t=int(now_ts),
+                temp=float(temp),
+                target=float(target) if target is not None else None,
+                power_percent=float(power_percent) if power_percent is not None else None,
+            )
+            self._tsdb_last_sample_ts = now_ts
         except Exception:
             # Best-effort: DB failures should never stop kiln control.
-            log.exception("SQLite sample persist failed (id=%s)" % sid)
+            log.exception("TSDB sample persist failed")
             return
 
     def _cooldown_capture_threshold(self) -> float:
@@ -383,10 +422,6 @@ class Oven(threading.Thread):
         st = self.get_state()
         temp = st.get("temperature", 0)
 
-        # Best-effort: continue persisting even though session outcome is already finalized.
-        # If we just crossed below the threshold, persist one final sample < threshold,
-        # then stop further cooldown capture.
-        self._persist_sample_if_possible(session_id=sid, state=st)
         if temp < self._cooldown_capture_threshold():
             log.info("cooldown capture ended (temp=%.1f below threshold)" % float(temp))
             self._cancel_cooldown_capture()
@@ -513,7 +548,7 @@ class Oven(threading.Thread):
                     except Exception:
                         log.exception("SQLite session stop failed (id=%s)" % sid)
 
-            # Continue persisting samples into the (now-ended) session until kiln cools.
+            # Track cooldown state for UI/metadata; samples are global in TSDB.
             if sid:
                 self._start_cooldown_capture(session_id=sid)
 
@@ -649,6 +684,9 @@ class Oven(threading.Thread):
 
                 # If the last run completed, keep recording the cooling tail.
                 self._cooldown_capture_tick()
+
+                # Persist samples while the kiln is warm, even outside sessions.
+                self._persist_sample_if_possible()
 
                 # Preserve legacy idle behavior unless we're actively capturing cooldown.
                 time.sleep(self.time_step if self._cooldown_session_id else 1)

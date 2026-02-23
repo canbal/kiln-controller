@@ -5,6 +5,7 @@ export type ChartScheme = {
   seriesTarget: string
   seriesSchedule: string
   seriesTail: string
+  seriesPower: string
 
   text: string
   textStrong: string
@@ -34,6 +35,7 @@ export function schemeForTheme(theme: 'stoneware' | 'dark'): ChartScheme {
       seriesTarget: 'rgba(138, 90, 68, 0.95)',
       seriesSchedule: 'rgba(90, 140, 90, 0.70)',
       seriesTail: 'rgba(143, 132, 121, 0.92)',
+      seriesPower: 'rgba(160, 94, 188, 0.85)',
 
       text: 'rgba(45, 35, 28, 0.72)',
       textStrong: 'rgba(45, 35, 28, 0.92)',
@@ -63,6 +65,7 @@ export function schemeForTheme(theme: 'stoneware' | 'dark'): ChartScheme {
     seriesTarget: 'rgba(240, 176, 74, 0.95)',
     seriesSchedule: 'rgba(120, 200, 120, 0.70)',
     seriesTail: 'rgba(184, 198, 214, 0.92)',
+    seriesPower: 'rgba(180, 120, 255, 0.85)',
 
     text: 'rgba(255, 255, 255, 0.78)',
     textStrong: 'rgba(255, 255, 255, 0.92)',

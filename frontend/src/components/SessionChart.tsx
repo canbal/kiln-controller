@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiGetSession, apiListSessions } from '../api/sessions'
 import type { Session } from '../contract/sessions'
-import { extractTemp, extractTarget } from '../util/sampleExtract'
-import { fetchAllSessionSamples } from '../util/fetchSessionSamples'
+import { fetchSamplesWindow } from '../util/fetchSessionSamples'
 import type { Point } from '../util/chartFormatting'
 import { schemeForTheme } from '../util/chartTheme'
 import { resetYAxisCache } from '../util/chartSetup'
@@ -40,7 +39,7 @@ export function SessionChart(props: SessionChartProps) {
   const [sampleCount, setSampleCount] = useState(0)
   const [zoomed, setZoomed] = useState(false)
 
-  const seriesDataRef = useRef<[Point[], Point[], Point[], Point[]]>([[], [], [], []])
+  const seriesDataRef = useRef<[Point[], Point[], Point[], Point[], Point[]]>([[], [], [], [], []])
   const timeExtentMsRef = useRef<{ min: number; max: number } | null>(null)
 
   const baseOption = useMemo(
@@ -128,35 +127,43 @@ export function SessionChart(props: SessionChartProps) {
       // Fetch full session detail (includes schedule from meta_json).
       const detailRes = await apiGetSession({ sessionId: picked.id, signal: ac.signal })
 
-      // Fetch all samples (paginated).
-      const startedAt = typeof picked.started_at === 'number' ? picked.started_at : undefined
-      const samples = await fetchAllSessionSamples({
-        sessionId: picked.id,
-        from: startedAt,
+      // Fetch samples for the session time window.
+      const startedAt = typeof picked.started_at === 'number' ? picked.started_at : null
+      const endedAt = typeof picked.ended_at === 'number' ? picked.ended_at : null
+      const endSec = endedAt ?? Math.floor(Date.now() / 1000)
+      const startSec = startedAt ?? Math.max(0, endSec - 3600)
+
+      const samples = await fetchSamplesWindow({
+        from: startSec,
+        to: endSec,
+        maxPoints: 2000,
         signal: ac.signal,
       })
 
       // Build chart data.
-      const startedAtSec = typeof picked.started_at === 'number' ? picked.started_at : null
-      const endedAt = typeof picked.ended_at === 'number' ? picked.ended_at : null
+      const startedAtSec = startedAt
       const endMs = endedAt !== null ? endedAt * 1000 : null
 
       const actualProfile: Point[] = []
       const actualCooldown: Point[] = []
       const target: Point[] = []
+      const power: Point[] = []
 
       for (const s of samples) {
         const tMs = s.t * 1000
-        const temp = extractTemp(s.state)
-        const tgt = extractTarget(s.state)
+        const temp = s.temp ?? null
+        const tgt = s.target ?? null
+        const pwr = s.power_percent ?? null
 
         if (endMs !== null && tMs > endMs) {
           actualCooldown.push([tMs, temp])
           target.push([tMs, null])
+          power.push([tMs, pwr])
         } else {
           actualProfile.push([tMs, temp])
           target.push([tMs, tgt])
           actualCooldown.push([tMs, null])
+          power.push([tMs, pwr])
         }
       }
 
@@ -176,7 +183,7 @@ export function SessionChart(props: SessionChartProps) {
       setSampleCount(samples.length)
 
       // Store in refs for chart updates.
-      seriesDataRef.current = [actualProfile, actualCooldown, target, schedule]
+      seriesDataRef.current = [actualProfile, actualCooldown, target, schedule, power]
 
       const firstMs = samples.length ? samples[0].t * 1000 : null
       const lastMs = samples.length ? samples[samples.length - 1].t * 1000 : null
@@ -204,6 +211,7 @@ export function SessionChart(props: SessionChartProps) {
               },
               { data: target },
               { data: schedule },
+              { data: power },
             ],
           },
           { notMerge: false, lazyUpdate: true },

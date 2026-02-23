@@ -19,9 +19,14 @@ export function buildBaseOption(
   const actualName = overrides?.seriesActualName ?? 'Actual'
   const emphasis = overrides?.seriesEmphasis ? { focus: 'series' as const } : undefined
 
+  const formatPercent = (v: number | null | undefined) => {
+    if (typeof v !== 'number' || !Number.isFinite(v)) return '--'
+    return `${Math.round(v)}%`
+  }
+
   return {
     animation: false,
-    grid: { left: 58, right: 14, top: 34, bottom: 54 },
+    grid: { left: 58, right: 52, top: 34, bottom: 54 },
     brush: {
       toolbox: [],
       xAxisIndex: 0,
@@ -49,9 +54,25 @@ export function buildBaseOption(
       backgroundColor: scheme.tooltipBg,
       borderColor: scheme.tooltipBorder,
       textStyle: { color: scheme.textStrong },
-      valueFormatter: (v: unknown) => {
+      formatter: (params: unknown) => {
+        const entries = Array.isArray(params) ? params : [params]
+        if (!entries.length) return ''
+        const first = entries[0] as { value?: unknown; axisValue?: unknown }
+        const axisValue = Array.isArray(first?.value) ? first.value[0] : first?.axisValue
+        const header = typeof axisValue === 'number' ? fmtAxisTime(axisValue) : ''
         const u = unitRef.current
-        return typeof v === 'number' && Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
+
+        const lines = entries.map((entry) => {
+          const e = entry as { seriesName?: unknown; value?: unknown }
+          const name = typeof e.seriesName === 'string' ? e.seriesName : ''
+          const value = Array.isArray(e.value) ? e.value[1] : e.value
+          if (name.toLowerCase().includes('power')) {
+            return `${name}: ${formatPercent(typeof value === 'number' ? value : null)}`
+          }
+          return `${name}: ${typeof value === 'number' && Number.isFinite(value) ? `${fmtTemp(value)}°${u}` : '--'}`
+        })
+
+        return [header, ...lines].filter(Boolean).join('<br/>')
       },
     },
     dataZoom: [
@@ -91,20 +112,33 @@ export function buildBaseOption(
       axisLine: { lineStyle: { color: scheme.line } },
       splitLine: { lineStyle: { color: scheme.grid } },
     },
-    yAxis: {
-      type: 'value',
-      boundaryGap: ['10%', '10%'],
-      minInterval: 0.5,
-      axisLabel: {
-        color: scheme.text,
-        formatter: (v: number) => {
-          const u = unitRef.current
-          return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
+    yAxis: [
+      {
+        type: 'value',
+        boundaryGap: ['10%', '10%'],
+        minInterval: 0.5,
+        axisLabel: {
+          color: scheme.text,
+          formatter: (v: number) => {
+            const u = unitRef.current
+            return Number.isFinite(v) ? `${fmtTemp(v)}°${u}` : '--'
+          },
         },
+        axisLine: { lineStyle: { color: scheme.line } },
+        splitLine: { lineStyle: { color: scheme.grid } },
       },
-      axisLine: { lineStyle: { color: scheme.line } },
-      splitLine: { lineStyle: { color: scheme.grid } },
-    },
+      {
+        type: 'value',
+        min: 0,
+        max: 100,
+        axisLabel: {
+          color: scheme.text,
+          formatter: (v: number) => formatPercent(v),
+        },
+        axisLine: { lineStyle: { color: scheme.line } },
+        splitLine: { show: false },
+      },
+    ],
     series: [
       {
         name: actualName,
@@ -147,6 +181,17 @@ export function buildBaseOption(
         lineStyle: { width: 1.5, type: 'dotted', color: scheme.seriesSchedule },
         ...(emphasis ? { emphasis } : {}),
         data: [] as Point[],
+      },
+      {
+        name: 'Power',
+        type: 'line',
+        showSymbol: false,
+        yAxisIndex: 1,
+        itemStyle: { color: scheme.seriesPower },
+        lineStyle: { width: 1.5, color: scheme.seriesPower },
+        ...(emphasis ? { emphasis } : {}),
+        data: [] as Point[],
+        sampling: 'lttb',
       },
     ],
   }

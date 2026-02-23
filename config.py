@@ -208,3 +208,11 @@ kiln_profiles_directory = os.path.abspath(os.path.join(os.path.dirname( __file__
 ########################################################################
 # SQLite session storage (new UI /app)
 sqlite_db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "storage", "kiln.sqlite3"))
+
+########################################################################
+# Time-series storage (VictoriaMetrics)
+tsdb_enabled = True
+tsdb_url = "http://localhost:8428"
+tsdb_threshold_temp = 150  # only record samples at/above this temperature
+tsdb_sample_interval_sec = 1
+tsdb_max_points_default = 2000

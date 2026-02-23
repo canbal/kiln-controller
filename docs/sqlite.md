@@ -1,6 +1,7 @@
 # SQLite (Sessions Storage)
 
-The modern UI workstream stores firing session history in a single local SQLite file.
+The modern UI workstream stores firing session metadata in a single local SQLite file.
+Time-series samples are stored in the configured TSDB (VictoriaMetrics) when enabled.
 
 ## Location
 

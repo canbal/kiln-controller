@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useStatusWs } from './ws/status'
 import { useConfigWs } from './ws/config'
 import { LiveTempChart } from './components/LiveTempChart'
+import { useEtaEstimate } from './hooks/useEtaEstimate'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { SessionsListPage } from './pages/SessionsListPage'
 import { appHref, useAppRoute } from './router'
@@ -143,10 +144,14 @@ function App() {
   const totalS = oven && Number.isFinite(oven.totaltime) ? oven.totaltime : null
   const progressPct = running ? computeProgressPct(runtimeS, totalS) : null
   const remainingS = running && runtimeS !== null && totalS !== null ? Math.max(0, totalS - runtimeS) : null
-  const estRemainingS =
-    running && runtimeS !== null && runtimeS > 0 && wallElapsedS !== null && remainingS !== null
-      ? (wallElapsedS / runtimeS) * remainingS
-      : null
+  const estRemainingS = useEtaEstimate({
+    oven,
+    backlog: status.backlog,
+    runtimeS,
+    elapsedS: wallElapsedS,
+    totalS,
+    tempScale: cfg.tempScale ?? null,
+  })
 
   const cooldownActive = oven?.cooldown_active === true
   const cooldownElapsedS =
