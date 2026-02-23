@@ -118,6 +118,8 @@ sim_R_ho_air   = 0.05   # K/W  " with internal air circulation
 temp_scale          = "f" # c = Celsius | f = Fahrenheit - Unit to display
 time_scale_slope    = "h" # s = Seconds | m = Minutes | h = Hours - Slope displayed in temp_scale per time_scale_slope
 time_scale_profile  = "m" # s = Seconds | m = Minutes | h = Hours - Enter and view target time in time_scale_profile
+# Fixed asymptote used by ETA exponential fit (always Fahrenheit).
+eta_max_temp_f      = 2350
 
 # emergency shutoff the profile if this temp is reached or exceeded.
 # This just shuts off the profile. If your SSR is working, your kiln will
