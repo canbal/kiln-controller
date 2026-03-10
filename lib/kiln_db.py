@@ -320,20 +320,23 @@ def list_session_samples(
     session_id: str,
     from_t: Optional[int] = None,
     to_t: Optional[int] = None,
-    limit: int = 500,
+    max_points: int = 10000,
 ) -> List[Dict[str, Any]]:
     """List samples for a session, optionally bounded by unix seconds.
 
     - from_t/to_t are inclusive bounds on the INTEGER 't' column.
     - Results are ordered by t asc.
     - The returned rows include parsed 'state' JSON.
+    - When there are more rows than max_points, SQLite downsamples
+      using a ROWID modulo filter so only ~max_points rows are fetched
+      into Python memory.
     """
 
-    limit_i = int(limit)
-    if limit_i <= 0:
-        limit_i = 500
-    if limit_i > 5000:
-        limit_i = 5000
+    max_pts = int(max_points)
+    if max_pts <= 0:
+        max_pts = 10000
+    if max_pts > 10000:
+        max_pts = 10000
 
     where = ["session_id = ?"]
     params: List[Any] = [session_id]
@@ -344,10 +347,22 @@ def list_session_samples(
         where.append("t <= ?")
         params.append(int(to_t))
 
-    params.append(limit_i)
+    where_sql = " AND ".join(where)
 
     conn = _connect_configured(db_path)
     try:
+        # Count total matching rows to decide if we need to downsample.
+        count_row = conn.execute(
+            "SELECT COUNT(*) FROM session_samples WHERE {w}".format(w=where_sql),
+            tuple(params),
+        ).fetchone()
+        total = int(count_row[0])
+
+        if total > max_pts:
+            every_nth = total // max_pts
+            where.append("ROWID %% %d = 0" % every_nth)
+            where_sql = " AND ".join(where)
+
         rows = list(
             conn.execute(
                 """
@@ -355,8 +370,7 @@ def list_session_samples(
                 FROM session_samples
                 WHERE {where_sql}
                 ORDER BY t ASC
-                LIMIT ?
-                """.format(where_sql=" AND ".join(where)),
+                """.format(where_sql=where_sql),
                 tuple(params),
             )
         )

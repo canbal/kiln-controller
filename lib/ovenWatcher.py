@@ -2,6 +2,11 @@ import threading,logging,json,time,datetime
 from oven import Oven
 log = logging.getLogger(__name__)
 
+# Maximum samples to keep in memory for the backlog chart.
+# At 1 sample/sec this is ~3.3 hours of data.  Older entries are
+# discarded to keep RAM usage bounded on constrained devices (RPi Zero).
+MAX_LOG_SAMPLES = 12000
+
 
 class OvenWatcher(threading.Thread):
     def __init__(self,oven):
@@ -30,6 +35,10 @@ class OvenWatcher(threading.Thread):
             # record state for any new clients that join
             if oven_state.get("state") == "RUNNING":
                 self.last_log.append(oven_state)
+                if len(self.last_log) > MAX_LOG_SAMPLES:
+                    # Drop oldest 10% to avoid trimming every iteration
+                    drop = MAX_LOG_SAMPLES // 10
+                    self.last_log = self.last_log[drop:]
             else:
                 self.recording = False
             self.notify_all(oven_state)
@@ -67,10 +76,8 @@ class OvenWatcher(threading.Thread):
             'log': self.lastlog_subset(),
             #'started': self.started
         }
-        print(backlog)
         backlog_json = json.dumps(backlog)
         try:
-            print(backlog_json)
             observer.send(backlog_json)
         except:
             log.error("Could not send backlog to new observer")

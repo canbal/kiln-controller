@@ -253,7 +253,7 @@ def v1_list_session_samples(session_id):
     try:
         from_t = _q_int("from", default=None, min_value=0, max_value=2**31 - 1)
         to_t = _q_int("to", default=None, min_value=0, max_value=2**31 - 1)
-        limit = _q_int("limit", default=500, min_value=1, max_value=5000)
+        max_points = _q_int("max_points", default=10000, min_value=100, max_value=10000)
     except ValueError:
         return _json_response({"success": False, "error": "bad_request"}, status=400)
 
@@ -265,7 +265,7 @@ def v1_list_session_samples(session_id):
         if not sess:
             return _json_response({"success": False, "error": "not_found"}, status=404)
 
-        samples = list_session_samples(db_path, session_id=session_id, from_t=from_t, to_t=to_t, limit=limit)
+        samples = list_session_samples(db_path, session_id=session_id, from_t=from_t, to_t=to_t, max_points=max_points)
         return _json_response(
             {
                 "success": True,
