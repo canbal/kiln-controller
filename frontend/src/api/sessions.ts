@@ -93,14 +93,14 @@ export async function apiListSessionSamples(opts: {
   sessionId: string
   from?: number | null
   to?: number | null
-  limit?: number
+  max_points?: number
   signal?: AbortSignal
 }): Promise<ApiOk<{ session: Session | null; samples: SessionSample[] }> | ApiErr> {
   try {
     const qs = new URLSearchParams()
     if (typeof opts.from === 'number') qs.set('from', String(opts.from))
     if (typeof opts.to === 'number') qs.set('to', String(opts.to))
-    if (typeof opts.limit === 'number') qs.set('limit', String(opts.limit))
+    if (typeof opts.max_points === 'number') qs.set('max_points', String(opts.max_points))
 
     const json = await fetchJson(`/v1/sessions/${encodeURIComponent(opts.sessionId)}/samples?${qs.toString()}`, {
       signal: opts.signal,
